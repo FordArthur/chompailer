@@ -21,5 +21,5 @@
 
 // best to \tnumber  |
 void report_error(Error err) {
-  printf("\t" BOLDRED "|" RESET "\n   " YELLOW "%lu" RESET "\t" BOLDRED "|" RESET RED " %s" RESET "\n\t" BOLDRED "|" RESET YELLOW " ^ %lu" RESET "\n", err.line, err.err, err.index);
+  printf("\t" BOLDRED "|" RESET "\n   " YELLOW "%lu" RESET "\t" BOLDRED "|" RESET RED " %s" RESET "\n\t" BOLDRED "|" RESET YELLOW " ^ %lu" RESET "\n\n", err.line, err.err, err.index);
 }

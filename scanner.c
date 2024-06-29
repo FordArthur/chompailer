@@ -25,13 +25,21 @@ static inline char* reserve_token(const unsigned long size, const char* stream) 
   return tok;
 }
 
-static inline bool in_string(char c, const char* s) {
+static inline bool isoper(char c) {
   unsigned long i = 0;
+  const char s[] = "ºª!·$%&/=?¿^+*<>,.:-_|@#~½¬•";
   for (; s[i] && s[i] != c; i++);
   return s[i];
 }
 
+static inline bool isiden(char c) {
+  return isalnum(c) || c == '_';
+}
+
 static inline char consume(char** stream_ptr) {
+  if (!**stream_ptr)
+    return '\0';
+
   char ch = *((*stream_ptr)++);
   if (ch == '\n') {
     push(_LINES, *stream_ptr);
@@ -126,7 +134,8 @@ Tokens scanner(char *stream) {
             token_stream,
             mktok(COMMENT, _LINE, index, size, start_comment)
           );
-        }
+        } else 
+          goto scan_symbol;
         break;
       case '\'':
         if (stream[1] == '\'' || stream[0] == '\\' && stream[2] == '\'') {
@@ -198,27 +207,17 @@ Tokens scanner(char *stream) {
 
         break;
       }
-      default: {
+      default: 
+      scan_symbol: {
         char* start_token = stream - 1;
         unsigned long index = _INDEX - 1;
         unsigned long size;
 
-        bool is_alnum = false;
-        bool is_oper = false;
+        bool is_alnum = isiden(curchar);
+        bool (*symbol_scanning)(char) = is_alnum? isiden : isoper;
 
-        while (*stream && !isspace(*stream)) {
-          curchar = consume(&stream);
-          is_alnum |= isalnum(curchar);
-          is_oper |= in_string(curchar, "ºª!·$%&/=?¿^+*<>,.:-_|@#~½¬•");
-        }
-
-        if (is_alnum && is_oper) {
-          _IS_CORRECT_STREAM = false;
-          push(
-            error_stream, 
-            mkerr(SCANNER, _LINE, index, "Symbol must not use alphanumerics and operator characters at the same time")
-          );
-          break;
+        while (*stream && (*symbol_scanning)(*stream)) {
+          consume(&stream);
         }
 
         start_token = reserve_token(size = stream - start_token, start_token);
@@ -228,10 +227,6 @@ Tokens scanner(char *stream) {
           mktok(is_alnum? IDENTIFIER : OPERATOR, _LINE, index, size, start_token)
         );
 
-        if (*stream) {
-          *stream = '\0';
-          consume(&stream);
-        }
         break;
       }
     }
