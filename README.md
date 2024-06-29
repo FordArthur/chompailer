@@ -1,1 +1,2 @@
-# chompailer
+# Chompailer
+The Glorious Chorilang Compiler
