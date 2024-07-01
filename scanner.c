@@ -1,6 +1,5 @@
 #include "scanner.h"
-
-#include <stdio.h> // Debugging
+#include "vec.h"
 
 #define mktok(_type, _line, _index, _length, _token) ((Token) {.type = _type, .line = _line, .index = _index, .length = _length, .token = _token})
 #define mkerr(_type, _line, _index, _err) ((Error) {.type = _type, .line = _line, .index = _index, .err = _err}) 
@@ -25,15 +24,29 @@ static inline char* reserve_token(const unsigned long size, const char* stream) 
   return tok;
 }
 
+static inline char escape_char(char c) {
+  switch (c) {
+    case 'n': return '\n';
+    case 'b': return '\b';
+    case 'f': return '\f';
+    case 'r': return '\r';
+    case 'v': return '\v';
+    case '0': return '\0';
+    case 't': return '\t';
+    default: return c;
+  }
+}
+
 static inline bool isoper(char c) {
   unsigned long i = 0;
   const char s[] = "ºª!·$%&/=?¿^+*<>,.:-_|@#~½¬•";
+  #pragma unroll 4
   for (; s[i] && s[i] != c; i++);
   return s[i];
 }
 
 static inline bool isiden(char c) {
-  return isalnum(c) || c == '_';
+  return isalnum(c) || c == '_' || c == '\'';
 }
 
 static inline char consume(char** stream_ptr) {
@@ -101,6 +114,12 @@ Tokens scanner(char *stream) {
           mktok(CLOSE_CURLY, _LINE, _INDEX, 1, NULL)
         );
         break;
+      case ';':
+        push(
+          token_stream, 
+          mktok(SEMI_COLON, _LINE, _INDEX, 1, NULL)
+        );
+        break;
       case '/':
         if (stream[0] == '/') {
           char* start_comment = stream - 1;
@@ -139,14 +158,15 @@ Tokens scanner(char *stream) {
         break;
       case '\'':
         if (stream[1] == '\'' || stream[0] == '\\' && stream[2] == '\'') {
+          char offs, character = (offs = stream[1] == '\'')? stream[0] : escape_char(stream[1]);
+
           push(
             token_stream,
-            mktok(CHARACTER, _LINE, _INDEX, 1, stream)
+            mktok(CHARACTER, _LINE, _INDEX, 1, reserve_token(1, &character))
           );
-          char offs;
-          stream[offs = 1 + (stream[0] == '\\')] = '\0';
-          stream += offs + 1;
-          _INDEX += offs + 1;
+
+          stream += (!offs) + 2;
+          _INDEX += (!offs) + 2;
         } else {
           _IS_CORRECT_STREAM = false;
           push(
@@ -155,6 +175,38 @@ Tokens scanner(char *stream) {
           );
         }
         break;
+      case '"': {
+        char* start_string = new_vector_with_capacity(*start_string, 32);
+        push(start_string, '\"');
+        unsigned long index = _INDEX - 1;
+
+        while (*stream && *stream != '"') {
+          if (*stream == '\\') {
+            stream++;
+            push(start_string, escape_char(*stream));
+          } else {
+            push(start_string, *stream);
+          }
+          consume(&stream);
+        }
+        if (!*stream) {
+          _IS_CORRECT_STREAM = false;
+          push(
+            error_stream,
+            mkerr(SCANNER, _LINE, index, "Unmatched string quotation")
+          );
+          break;
+        }
+
+        push(start_string, '\"');
+
+        push(
+          token_stream, 
+          mktok(STRING, _LINE, index, _INDEX - index - 1, start_string)
+        );
+        consume(&stream);
+        break;
+      }
       case '0':
       case '1':
       case '2':
@@ -174,28 +226,10 @@ Tokens scanner(char *stream) {
         while (isdigit(*stream))
           consume(&stream);
 
-        if (*stream == '.') {
-          if (numtype == NATURAL) {
-            consume(&stream);
-            numtype = REAL;
-            goto scan_num;
-          }
-          _IS_CORRECT_STREAM = false;
-          push(
-            error_stream, 
-            mkerr(SCANNER, _LINE, index, "Too many dots on a number")
-          );
+        if (*stream == '.' && numtype == NATURAL) {
           consume(&stream);
-          break;
-        }
-
-        if (*stream && !isspace(*stream)) {
-          _IS_CORRECT_STREAM = false;
-          push(
-            error_stream, 
-            mkerr(SCANNER, _LINE, index, "Must separate number with space")
-          );
-          break;
+          numtype = REAL;
+          goto scan_num;
         }
 
         start_number = reserve_token(size = stream - start_number, start_number);

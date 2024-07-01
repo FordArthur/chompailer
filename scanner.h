@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "vec.h"
+#include "trie.h"
 #include "compiler_inner_types.h"
 
 typedef enum TokenType {
@@ -12,6 +13,7 @@ typedef enum TokenType {
   OPEN_BRACKET, CLOSE_BRACKET,
   OPEN_CURLY, CLOSE_CURLY,
 
+  SEMI_COLON,
   DOUBLE_COLON,
   COMA,
   ARROW,
@@ -29,7 +31,7 @@ typedef enum TokenType {
 } TokenType;
 
 typedef struct Token {
-  TokenType type; // MIN_INT in case of error
+  TokenType type;
   unsigned long index;
   unsigned long line;
   unsigned long length;
