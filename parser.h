@@ -4,14 +4,16 @@
 #include "scanner.h"
 #include "compiler_inner_types.h"
 
+#define MAX_PRECEDENCE 256
+#define MAX_PARENTHESIS 256
+
 typedef enum TermType {
   FUNCTION,
   LITERAL,
   VARIABLE,
+  TYPE_CONSTRUCTOR,
 
   TYPE,
-
-  TYPE_CONSTRUCTOR,
 } TermType;
 
 typedef enum ASTType {
@@ -27,6 +29,9 @@ typedef struct ASTNode {
   union {
     struct {
       TermType type;
+      unsigned long index;
+      unsigned long line;
+      unsigned long length;
       char* name;
     } term;
     struct ASTNode* expression; // first is function rest is arguments
