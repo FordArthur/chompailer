@@ -23,7 +23,7 @@ typedef enum TokenType {
 
   NATURAL, REAL,
   CHARACTER, STRING,
-  IDENTIFIER, OPERATOR, TYPE,
+  IDENTIFIER, OPERATOR, TYPE_K,
 
   COMMENT,
 
@@ -38,18 +38,15 @@ typedef struct Token {
   char* token;
 } Token;
 
-typedef struct InfixIndicator {
-  unsigned short precedence;
-  bool is_infixr;
-} InfixIndicator;
+typedef Token* Priority;
 
 typedef struct Tokens {
   bool is_correct_stream;
+  char** lines;
   union {
     struct {
       Token* token_stream;
-      InfixIndicator* infixes;
-      char** lines;
+      Priority* infixes;
     } scanned;
     Error* errors;
   };

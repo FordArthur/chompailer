@@ -1,5 +1,6 @@
 #include "scanner.h"
 #include "vec.h"
+#include <ctype.h>
 
 #define mktok(_type, _line, _index, _length, _token) ((Token) {.type = _type, .line = _line, .index = _index, .length = _length, .token = _token})
 #define mkerr(_type, _line, _index, _err) ((Error) {.type = _type, .line = _line, .index = _index, .err = _err}) 
@@ -7,7 +8,7 @@
 static unsigned long _INDEX = 1;
 static unsigned long _LINE = 1;
 
-static InfixIndicator* _INFIXES;
+static Priority* _INFIXES;
 static char** _LINES;
 
 static bool _IS_CORRECT_STREAM = true;
@@ -258,7 +259,9 @@ Tokens scanner(char *stream) {
 
         push(
           token_stream, 
-          mktok(is_alnum? IDENTIFIER : OPERATOR, _LINE, index, size, start_token)
+          mktok(isupper(*start_token)? TYPE_K : is_alnum? IDENTIFIER : OPERATOR, _LINE, index, size, start_token)
+        //      ^-------------------------------------------------------------- type should be stored somewhere so it
+        //                                                                      can be added to the infixes if appropiate
         );
 
         break;
@@ -266,16 +269,22 @@ Tokens scanner(char *stream) {
     }
   }
 
-  if (_IS_CORRECT_STREAM)
+  if (_IS_CORRECT_STREAM) {
+    push(
+      token_stream,
+      mktok(_EOF, _LINE, _INDEX, 1, NULL);
+    );
     return (Tokens) {
       .is_correct_stream = true,
+      .lines = _LINES,
       .scanned.token_stream = token_stream,
       .scanned.infixes = NULL,
-      .scanned.lines = NULL,
     };
+  }
   else 
     return (Tokens) {
       .is_correct_stream = false,
+      .lines = _LINES,
       .errors = error_stream
     };
 }
@@ -291,7 +300,7 @@ int main(int argc, char* argv[]) {
       print_token(stream.scanned.token_stream[i]);
   } else {
     for_each(i, stream.errors)
-      report_error(stream.errors[i]);
+      report_error(stream.errors[i], stream.lines);
   }
   return 0;
 }

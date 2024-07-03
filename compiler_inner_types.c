@@ -20,6 +20,14 @@
 #define BOLDWHITE   "\033[1m\033[37m"      /* Bold White */
 
 // best to \tnumber  |
-void report_error(Error err) {
+void report_error(const Error err, char** lines) {
   printf("\t" BOLDRED "|" RESET "\n   " YELLOW "%lu" RESET "\t" BOLDRED "|" RESET RED " %s" RESET "\n\t" BOLDRED "|" RESET YELLOW " ^ %lu" RESET "\n\n", err.line, err.err, err.index);
+  /*
+  printf(BOLDRED "\t|\n" RESET);
+  *(lines[err.line]) = '\0';
+  printf("\t" YELLOW "%lu" RESET "   | %s\n", err.line, lines[err.line - 1]);
+  *(lines[err.line]) = '\n';
+  printf(BOLDRED "\t|" RESET YELLOW "%s @ %lu" RESET, err.err, err.index);
+  printf(BOLDRED "\t|\n" RESET);
+  */
 }
