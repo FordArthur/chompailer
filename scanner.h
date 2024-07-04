@@ -13,17 +13,28 @@ typedef enum TokenType {
   OPEN_BRACKET, CLOSE_BRACKET,
   OPEN_CURLY, CLOSE_CURLY,
 
-  SEMI_COLON,
-  DOUBLE_COLON,
-  COMA,
-  ARROW,
-  DOUBLE_ARROW,
-  EQUALS,
-  LAMBDA, // Either \ or λ
-
   NATURAL, REAL,
   CHARACTER, STRING,
   IDENTIFIER, OPERATOR, TYPE_K,
+
+  LINE,
+  SEMI_COLON,
+  DOUBLE_COLON,
+  COMA,
+  EQUALS,
+  LAMBDA, // Either \ or λ
+  BAR,
+  STAR,
+  AMPERSAND,
+  DOUBLE_BAR,
+  DOUBLE_AMPERSAND,
+  ARROW,
+  DOUBLE_ARROW,
+  CONSTANT_DEFINE, // :=
+  IF,
+  THEN,
+  ELSE,
+  LET,
 
   COMMENT,
 
@@ -43,13 +54,11 @@ typedef Token* Priority;
 typedef struct Tokens {
   bool is_correct_stream;
   char** lines;
-  union {
-    struct {
-      Token* token_stream;
-      Priority* infixes;
-    } scanned;
-    Error* errors;
-  };
+  struct {
+    Token* token_stream;
+    Priority* infixes;
+  } scanned;
+  Error* error_buf;
 } Tokens;
 
 /** Scanner rules:

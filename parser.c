@@ -4,37 +4,42 @@
 
 #define token_to_term(termtype, tok) (ASTNode) {.type = TERM, .term.type = termtype, .term.index = tok.index, .term.line = tok.line, .term.length = tok.length, .term.name = tok.token}
 
-typedef struct ExpressionStack {
-  unsigned long argument_count;
-  Token* expression;
-} ExpressionStack;
+typedef Token* ExpInfo;
 
-typedef struct ;
+typedef struct PrecInfo {
+  unsigned long precedence;
+  bool is_infixr;
+} PrecInfo;
 
-inline unsigned long get_arg_length(const char* name) {
+typedef struct PrecEntry {
+  PrecInfo info;
+  ASTNode* node;
+} PrecEntry;
+
+
+inline PrecInfo get_precedence(const char* name) {
   // ...
   return 0;
 }
 
-
-
-AST parser(Token* tokens, Priority* infixes) {
+AST parser(Token* tokens, Priority* infixes, Error* error_buf) {
   Token* ast = new_vector_with_capacity(*ast, 16);
-  Token* leftexp = new_vector_with_capacity(*leftexp, 8);
-  Token* rightexp = new_vector_with_capacity(*rightexp, 8);
+  bool is_correct_ast = true;
 
-  Token* precedence_table[MAX_PRECEDENCE] = {0}; // It can store up to MAX_PRECEDENCE/2 tokens
-					   	 // since we only track of the lowest and highest
-					   	 // tokens in any precedence succession
+  Token* curexp = new_vector_with_capacity(*curexp, 8);
+  bool waiting_rightexpr = false;
 
-  ExpressionStack exp_stack[MAX_PARENTHESIS] = {0}; // Here we utilize the entire size 
+  PrecEntry precedence_table[MAX_PRECEDENCE] = {0}; // It can store up to MAX_PRECEDENCE/2 tokens
+						    // since we only track of the lowest and highest
+						    // tokens in any precedence succession
+
+  ExpInfo exp_stack[MAX_PARENTHESIS] = {0}; // Here we utilize the entire size 
+
   // !! Type depends on MAX_PARENTHESIS !!
   unsigned char exp_stack_top = 0;
   
-  unsigned long cur_arg_count = 0;
-  Token* curexp = new_vector_with_capacity(*curexp, 8);
-
-  bool waiting_rightexpr = false;
+  PrecInfo curprecedence;
+  PrecEntry belowprecnode;
 
   // Build table for infixes
   // ...
@@ -43,7 +48,7 @@ AST parser(Token* tokens, Priority* infixes) {
   for (; tokens->type != _EOF; tokens++) {
     switch (tokens->type) {
       case OPEN_PAREN:
-	exp_stack[curexp_stack_top++] = (ExpressionStack) {
+	exp_stack[curexp_stack_top++] = (ExpInfo) {
 	  .argument_count = cur_arg_count,
 	  .expression = curexp
 	};
@@ -54,26 +59,86 @@ AST parser(Token* tokens, Priority* infixes) {
 	curexp = exp_stack[exp_stack_top];
 	cur_arg_count = exp_stack[exp_stack_top];
 	break;
+      case NATURAL:
+	push(curexp, token_to_term(TNATURAL, (*tokens)));
+	if (waiting_rightexpr) {
+	  curexp = new_vector_with_capacity(*curexp, 8);
+	  waiting_rightexpr = false;
+	}
+        break;
+      case REAL:
+	push(curexp, token_to_term(TREAL, (*tokens)));
+	if (waiting_rightexpr) {
+	  curexp = new_vector_with_capacity(*curexp, 8);
+	  waiting_rightexpr = false;
+	}
+        break;
+      case CHARACTER:
+	push(curexp, token_to_term(TCHARACTER, (*tokens)));
+	if (waiting_rightexpr) {
+	  curexp = new_vector_with_capacity(*curexp, 8);
+	  waiting_rightexpr = false;
+	}
+        break;
+      case STRING:
+	push(curexp, token_to_term(TSTRING, (*tokens)));
+	if (waiting_rightexpr) {
+	  curexp = new_vector_with_capacity(*curexp, 8);
+	  waiting_rightexpr = false;
+	}
+        break;
       case IDENTIFIER:
-	if (!cur_arg_count) {
-	  cur_arg_count = get_arg_length(tokens->token);
-	  push(curexp, token_to_term(cur_arg_count? FUNCTION : VARIABLE, (*tokens)));
-	} else {
-	  cur_arg_count--;
-	  push(curexp, token_to_term(VARIABLE, (*tokens)));
+	// Could be a variable as well!
+	// (i.e. could be a function just that has type `a`)
+	push(curexp, token_to_term(FUNCTION, (*tokens)));
+	if (waiting_rightexpr) {
+	  curexp = new_vector_with_capacity(*curexp, 8);
+	  waiting_rightexpr = false;
 	}
         break;
       case OPERATOR:
-	waiting_rightexpr = true;
-	leftexpr = curexp;
-	curexp = new_vector_with_capacity(*curexp, 1);
-	push(curexp, token_to_term(FUNCTION, (*tokens)));
+	// check if waiting, and if so err
+	curprecedence = get_operator_precedence(*tokens);
+	for (unsigned long i = curprecedence.precedence; i >= 0; i--)
+	  if (belowprecnode = precedence_table[i])
+	    break;
+	// careful when the if doesnt run
+
+	if (curprecedence == belowprecnode.info.precedence && curprecedence.is_infixr != belowprecnode.info.is_infixr) {
+	    is_correct_ast = false;
+	    push(error_buf, mkerr(PARSER, tokens->line, tokens->index, "Cannot mix operators that associate left and right"));
+	    while (tokens->type != SEMICOLON) tokens++;
+	    break;
+	  }
+	if (curprecedence > belowprecnode.info.precedence + curprecedence.is_infixr*(curprecedence == belowprecnode.info.precedence)) {
+	  ASTNode* new_bin_expr = new_vector_with_capacity(*new_bin_expr, 1);
+	  new_bin_expr->type = BIN_EXPRESSION;
+	  new_bin_expr->bin_expression.left_expression = belowprecnode.node;
+	  new_bin_expr->bin_expression.right_expression = curexp;
+	  waiting_rightexpr = true;
+	  precedence_table[2*curprecedence] = *tokens;
+	  precedence_table[2*curprecedence + 1] = *tokens;
+	} else { 
+	  ASTNode* rightexpr;
+	  rightexpr = belowprecnode.node.bin_expression.right_expr;
+	  ASTNode* new_bin_expr = new_vector_with_capacity(*new_bin_expr, 1);
+	  new_bin_expr->type = BIN_EXPRESSION;
+	  new_bin_expr->bin_expression.left_expression = rightexpr;
+	  new_bin_expr->bin_expression.right_expression = curexp;
+	  waiting_rightexpr = true;
+	  precedence_table[2*curprecedence] = *tokens;
+	  precedence_table[2*curprecedence + 1] = *tokens;
+	}
+
+	
 	break;
-      case LINE:
-	// ...
-	// if (whatever) skip;
       case SEMICOLON:
-	push(ast, curexp);
+	if (exp_stack_top) {
+	  is_correct_ast = false;
+	  push(error_buf, mkerr(PARSER, tokens->line, tokens->index, "Unmatched parenthesis before semicolon"));
+	  expr_stack_top = 0;
+	} else
+	  push(ast, curexp);
 	curexp = new_vector_with_capacity(*curexp, 8);
       case COMMENT:
 	break;

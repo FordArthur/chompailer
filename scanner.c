@@ -1,17 +1,12 @@
 #include "scanner.h"
-#include "vec.h"
-#include <ctype.h>
 
 #define mktok(_type, _line, _index, _length, _token) ((Token) {.type = _type, .line = _line, .index = _index, .length = _length, .token = _token})
-#define mkerr(_type, _line, _index, _err) ((Error) {.type = _type, .line = _line, .index = _index, .err = _err}) 
 
 static unsigned long _INDEX = 1;
 static unsigned long _LINE = 1;
 
 static Priority* _INFIXES;
 static char** _LINES;
-
-static bool _IS_CORRECT_STREAM = true;
 
 void print_token(Token tok) {
   printf("\t|\n    %lu\t| %s (%d)\n\t| ^\n\t  %lu - %lu\n\n", tok.line, tok.token, tok.type, tok.index, tok.length);
@@ -57,6 +52,7 @@ static inline char consume(char** stream_ptr) {
   char ch = *((*stream_ptr)++);
   if (ch == '\n') {
     push(_LINES, *stream_ptr);
+    push(token_stream, mktok(LINE, _LINE, _INDEX, 1, NULL));
     _LINE++;
     _INDEX = 1;
   } else {
@@ -66,9 +62,10 @@ static inline char consume(char** stream_ptr) {
 }
 
 Tokens scanner(char *stream) {
+  bool is_correct_stream = true;
   _LINES = new_vector_with_capacity(*_LINES, 128);
   Token* token_stream = new_vector_with_capacity(*token_stream, 32);
-  Error* error_stream = new_vector_with_capacity(*error_stream, 16);
+  Error* error_buffer = new_vector_with_capacity(*error_buffer, 16);
   _INFIXES = new_vector_with_capacity(*_INFIXES, 8);
   
 
@@ -169,9 +166,9 @@ Tokens scanner(char *stream) {
           stream += (!offs) + 2;
           _INDEX += (!offs) + 2;
         } else {
-          _IS_CORRECT_STREAM = false;
+          is_correct_stream = false;
           push(
-            error_stream,
+            error_buffer,
             mkerr(SCANNER, _LINE, _INDEX - 1, "Unmatched single qoute (must delimit a character or an escaped character)")
           );
         }
@@ -191,9 +188,9 @@ Tokens scanner(char *stream) {
           consume(&stream);
         }
         if (!*stream) {
-          _IS_CORRECT_STREAM = false;
+          is_correct_stream = false;
           push(
-            error_stream,
+            error_buffer,
             mkerr(SCANNER, _LINE, index, "Unmatched string quotation")
           );
           break;
@@ -269,24 +266,18 @@ Tokens scanner(char *stream) {
     }
   }
 
-  if (_IS_CORRECT_STREAM) {
-    push(
-      token_stream,
-      mktok(_EOF, _LINE, _INDEX, 1, NULL);
-    );
-    return (Tokens) {
-      .is_correct_stream = true,
-      .lines = _LINES,
-      .scanned.token_stream = token_stream,
-      .scanned.infixes = NULL,
-    };
+  push(
+    token_stream,
+    mktok(_EOF, _LINE, _INDEX, 1, NULL);
+  );
+
+  return (Tokens) {
+    .is_correct_stream = is_correct_stream,
+    .lines = _lines,
+    .scanned._token_stream = token_stream,
+    .scanned.infixes = NULL,
+    .error_buf = error_buffer
   }
-  else 
-    return (Tokens) {
-      .is_correct_stream = false,
-      .lines = _LINES,
-      .errors = error_stream
-    };
 }
 
 int main(int argc, char* argv[]) {
@@ -299,8 +290,8 @@ int main(int argc, char* argv[]) {
     for_each(i, stream.scanned.token_stream)
       print_token(stream.scanned.token_stream[i]);
   } else {
-    for_each(i, stream.errors)
-      report_error(stream.errors[i], stream.lines);
+    for_each(i, stream.error_buf)
+      report_error(stream.error_buf[i], stream.lines);
   }
   return 0;
 }

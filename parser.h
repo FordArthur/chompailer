@@ -4,13 +4,17 @@
 #include "scanner.h"
 #include "compiler_inner_types.h"
 
+// !! Actual max precedence is halved !!
 #define MAX_PRECEDENCE 256
 #define MAX_PARENTHESIS 256
 
 typedef enum TermType {
   FUNCTION,
-  LITERAL,
-  VARIABLE,
+
+  TNATURAL,
+  TREAL,
+  TCHARACTER,
+  TSTRING,
   TYPE_CONSTRUCTOR,
 
   TYPE,
@@ -19,6 +23,7 @@ typedef enum TermType {
 typedef enum ASTType {
   TERM,
   EXPRESSION,
+  BIN_EXPRESSION,
   DECLARATION,
   F_DEFINITION,
   V_DEFINIITON,
@@ -35,6 +40,10 @@ typedef struct ASTNode {
       char* name;
     } term;
     struct ASTNode* expression; // first is function rest is arguments
+    struct {
+      struct ASTNode* left_expression;
+      struct ASTNode* right_expression;
+    } bin_expression;
     struct {
       struct ASTNode* expression;
       struct ASTNode* type;
@@ -55,10 +64,8 @@ typedef struct ASTNode {
 
 typedef struct AST {
   bool is_correct_ast;
-  union {
-    ASTNode* ast;
-    Error* errors;
-  };
+  ASTNode* ast;
+  Error* error_buf;
 } AST;
 
 AST parser(Token* tokens, Priority* infixes);

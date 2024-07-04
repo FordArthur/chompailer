@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define mkerr(_type, _line, _index, _err) ((Error) {.type = _type, .line = _line, .index = _index, .err = _err}) 
+
 typedef enum ErrorType {
   SCANNER, PARSER, TYPECHECKER
 } ErrorType;
