@@ -5,7 +5,6 @@
 static unsigned long _INDEX = 1;
 static unsigned long _LINE = 1;
 
-static Priority* _INFIXES;
 static char** _LINES;
 
 void print_token(Token tok) {
@@ -52,7 +51,6 @@ static inline char consume(char** stream_ptr) {
   char ch = *((*stream_ptr)++);
   if (ch == '\n') {
     push(_LINES, *stream_ptr);
-    push(token_stream, mktok(LINE, _LINE, _INDEX, 1, NULL));
     _LINE++;
     _INDEX = 1;
   } else {
@@ -66,8 +64,8 @@ Tokens scanner(char *stream) {
   _LINES = new_vector_with_capacity(*_LINES, 128);
   Token* token_stream = new_vector_with_capacity(*token_stream, 32);
   Error* error_buffer = new_vector_with_capacity(*error_buffer, 16);
-  _INFIXES = new_vector_with_capacity(*_INFIXES, 8);
-  
+  // This is fine, what we want to store in this vector is pointers, not structures
+  Token** infixes = new_vector_with_capacity(*infixes, 8); // NOLINT(bugprone-sizeof-expression)
 
   for (char curchar; (curchar = consume(&stream));) {
     switch (curchar) {
@@ -273,11 +271,11 @@ Tokens scanner(char *stream) {
 
   return (Tokens) {
     .is_correct_stream = is_correct_stream,
-    .lines = _lines,
-    .scanned._token_stream = token_stream,
+    .lines = _LINES,
+    .scanned.token_stream = token_stream,
     .scanned.infixes = NULL,
     .error_buf = error_buffer
-  }
+  };
 }
 
 int main(int argc, char* argv[]) {

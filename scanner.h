@@ -49,14 +49,12 @@ typedef struct Token {
   char* token;
 } Token;
 
-typedef Token* Priority;
-
 typedef struct Tokens {
   bool is_correct_stream;
   char** lines;
   struct {
     Token* token_stream;
-    Priority* infixes;
+    Token** infixes;
   } scanned;
   Error* error_buf;
 } Tokens;

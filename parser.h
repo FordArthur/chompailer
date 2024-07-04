@@ -68,6 +68,6 @@ typedef struct AST {
   Error* error_buf;
 } AST;
 
-AST parser(Token* tokens, Priority* infixes);
+AST parser(Token* tokens, Token** infixes, Error* error_buf);
 
 #endif  // !CHORILANG_PARSER_HEADER
