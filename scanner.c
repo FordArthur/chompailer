@@ -61,8 +61,9 @@ static inline char consume(char** stream_ptr) {
 
 Tokens scanner(char *stream) {
   bool is_correct_stream = true;
-  _LINES = new_vector_with_capacity(*_LINES, 128);
-  Token* token_stream = new_vector_with_capacity(*token_stream, 32);
+  _LINES = new_vector_with_capacity(*_LINES, 32);
+  push(_LINES, stream);
+  Token* token_stream = new_vector_with_capacity(*token_stream, 128);
   Error* error_buffer = new_vector_with_capacity(*error_buffer, 16);
   // This is fine, what we want to store in this vector is pointers, not structures
   Token** infixes = new_vector_with_capacity(*infixes, 8); // NOLINT(bugprone-sizeof-expression)
@@ -268,7 +269,7 @@ Tokens scanner(char *stream) {
     token_stream,
     mktok(_EOF, _LINE, _INDEX, 1, NULL);
   );
-
+  push(_LINES, stream);
   return (Tokens) {
     .is_correct_stream = is_correct_stream,
     .lines = _LINES,

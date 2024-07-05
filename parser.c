@@ -1,6 +1,4 @@
 #include "parser.h"
-#include "scanner.h"
-#include "vec.h"
 
 #define token_to_term(termtype, tok) (ASTNode) {.type = TERM, .term.type = termtype, .term.index = tok.index, .term.line = tok.line, .term.length = tok.length, .term.name = tok.token}
 
@@ -26,6 +24,9 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
   ASTNode* curexp = new_vector_with_capacity(*curexp, 8);
   bool waiting_rightexpr = false;
 
+  bool uninitialised_index_table = true;
+  // !! Type depends on MAX_PRECEDENCE !!
+  unsigned char precedence_index_table[MAX_PRECEDENCE];
   PrecEntry precedence_table[MAX_PRECEDENCE] = {0}; // It can store up to MAX_PRECEDENCE/2 tokens
   // since we only track of the lowest and highest
   // tokens in any precedence succession
@@ -54,48 +55,49 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
         break;
       case NATURAL:
         push(curexp, token_to_term(TNATURAL, (*tokens)));
-        if (waiting_rightexpr) {
-          curexp = new_vector_with_capacity(*curexp, 8);
-          waiting_rightexpr = false;
-        }
         break;
       case REAL:
         push(curexp, token_to_term(TREAL, (*tokens)));
-        if (waiting_rightexpr) {
-          curexp = new_vector_with_capacity(*curexp, 8);
-          waiting_rightexpr = false;
-        }
         break;
       case CHARACTER:
         push(curexp, token_to_term(TCHARACTER, (*tokens)));
-        if (waiting_rightexpr) {
-          curexp = new_vector_with_capacity(*curexp, 8);
-          waiting_rightexpr = false;
-        }
         break;
       case STRING:
         push(curexp, token_to_term(TSTRING, (*tokens)));
-        if (waiting_rightexpr) {
-          curexp = new_vector_with_capacity(*curexp, 8);
-          waiting_rightexpr = false;
-        }
         break;
       case IDENTIFIER:
         // Could be a variable as well!
         // (i.e. could be a function just that has type `a`)
         push(curexp, token_to_term(FUNCTION, (*tokens)));
-        if (waiting_rightexpr) {
-          curexp = new_vector_with_capacity(*curexp, 8);
-          waiting_rightexpr = false;
-        }
         break;
       case OPERATOR:
-        // check if waiting, and if so err
-        curprecedence = get_precedence(tokens->token);
-        for (unsigned long i = curprecedence.precedence; i >= 0; i--)
-          if ((belowprecnode = precedence_table[i]).node)
-            break;
-        // careful when the if doesnt run
+	if (waiting_rightexpr) {
+	  curexp = new_vector_with_capacity(*curexp, 8);
+	  waiting_rightexpr;
+	}
+	curprecedence = get_precedence(tokens->token);
+	if (uninitialised_index_table) {
+	  uninitialised_index_table = false;
+	  // !! Type depends on MAX_PRECEDENCE !!
+	  for (unsigned char i = 0; i < MAX_PRECEDENCE; i++)
+	    precedence_index_table[i] = curprecedence.precedence;
+
+	  ASTNode* new_bin_expr = new_vector_with_capacity(*new_bin_expr, 1);
+	  new_bin_expr->type = BIN_EXPRESSION;
+	  new_bin_expr->bin_expression.left_expression = curexp;
+	  curexp = new_vector_with_capacity(*curexp, 8);
+	  new_bin_expr->bin_expression.right_expression = curexp;
+          waiting_rightexpr = true;
+
+	  precedence_table[curprecedence.precedence] = (PrecEntry) {
+	    .info = curprecedence,
+	    .node = new_bin_expr
+	  };
+	  break;
+	}
+
+	belowprecnode = precedence_table[precedence_index_table[curprecedence.precedence]];
+
 
         if (curprecedence.precedence == belowprecnode.info.precedence && curprecedence.is_infixr != belowprecnode.info.is_infixr) {
           is_correct_ast = false;
@@ -103,13 +105,13 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
           while (tokens->type != SEMI_COLON) tokens++;
           break;
         }
+
         if (curprecedence.precedence > belowprecnode.info.precedence + curprecedence.is_infixr*(curprecedence.precedence == belowprecnode.info.precedence)) {
           ASTNode* new_bin_expr = new_vector_with_capacity(*new_bin_expr, 1);
           new_bin_expr->type = BIN_EXPRESSION;
           new_bin_expr->bin_expression.left_expression = belowprecnode.node;
           new_bin_expr->bin_expression.right_expression = curexp;
           waiting_rightexpr = true;
-          // insert elements in table
         } else { 
           ASTNode* rightexpr;
           rightexpr = belowprecnode.node->bin_expression.right_expression;
@@ -118,7 +120,6 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
           new_bin_expr->bin_expression.left_expression = rightexpr;
           new_bin_expr->bin_expression.right_expression = curexp;
           waiting_rightexpr = true;
-          // insert elements in table
         }
 
 
