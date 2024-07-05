@@ -41,12 +41,13 @@ typedef struct ASTNode {
     } term;
     struct ASTNode* expression; // first is function rest is arguments
     struct {
+      struct ASTNode* operator;
       struct ASTNode* left_expression;
       struct ASTNode* right_expression;
     } bin_expression;
     struct {
       struct ASTNode* expression;
-      struct ASTNode* type;
+      struct ASTNode** type;
     } declaration;
     struct {
       char* name;
@@ -67,6 +68,9 @@ typedef struct AST {
   ASTNode* ast;
   Error* error_buf;
 } AST;
+
+
+void print_AST(ASTNode* ast);
 
 AST parser(Token* tokens, Token** infixes, Error* error_buf);
 

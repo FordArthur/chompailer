@@ -10,6 +10,6 @@ typedef struct TrieNode {
   struct TrieNode* last_child;
 } TrieNode;
 
-TrieNode* follow_pattern(char* pattern, TrieNode trie);
+TrieNode* follow_pattern(char* pattern, TrieNode* trie);
 
 #endif  // !CHORILANG_TRIE_HEADER

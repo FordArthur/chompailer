@@ -72,5 +72,6 @@ typedef struct Tokens {
  */
 
 Tokens scanner(char* stream);
+void print_token(Token tok);
 
 #endif  // !CHOMPAILER_SCANNER

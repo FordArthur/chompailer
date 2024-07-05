@@ -279,18 +279,3 @@ Tokens scanner(char *stream) {
   };
 }
 
-int main(int argc, char* argv[]) {
-  if (argc != 2)
-    return 1;
-  Tokens stream = scanner(argv[1]);
-
-  printf("\n\n");
-  if (stream.is_correct_stream) {
-    for_each(i, stream.scanned.token_stream)
-      print_token(stream.scanned.token_stream[i]);
-  } else {
-    for_each(i, stream.error_buf)
-      report_error(stream.error_buf[i], stream.lines);
-  }
-  return 0;
-}
