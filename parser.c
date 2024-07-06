@@ -17,22 +17,22 @@ inline PrecInfo get_precedence(const char* name) {
   // ...
 }
 
-void print_ast(ASTNode* ast) {
+void print_AST(ASTNode* ast) {
   switch (ast->type) {
     case TERM:
       printf("%s", ast->term.name);
       break;
     case EXPRESSION:
       for_each(i, ast->expression) {
-	print_ast(ast + i);
-	printf(" ");
+        print_AST(ast + i);
+        printf(" ");
       }
       printf("\n");
       break;
     case BIN_EXPRESSION:
-      print_ast(ast->bin_expression.operator);
-      printf("\t"); print_ast(ast->bin_expression.left_expression); printf("\n");
-      printf("\t"); print_ast(ast->bin_expression.right_expression); printf("\n"); 
+      print_AST(ast->bin_expression.operator);
+      printf("\t"); print_AST(ast->bin_expression.left_expression); printf("\n");
+      printf("\t"); print_AST(ast->bin_expression.right_expression); printf("\n"); 
       break;
     case DECLARATION:
       break;
@@ -72,13 +72,13 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
   for (; tokens->type != _EOF; tokens++) {
     switch (tokens->type) {
       case OPEN_PAREN:
-	expr_stack_top++
+        expr_stack_top++;
         expr_stack[expr_stack_top] = curexpr;
         curexpr = new_vector_with_capacity(*curexpr, 8);
         break;
       case CLOSE_PAREN:
-	// if expr_stack_top == 0 then err
-	expr_stack_top--;
+        // if expr_stack_top == 0 then err
+        expr_stack_top--;
         push(expr_stack[expr_stack_top], *curexpr); // actually, push root node of the popped expr
         curexpr = expr_stack[expr_stack_top];
         break;
@@ -100,28 +100,28 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
         push(curexpr, token_to_term(FUNCTION, (*tokens)));
         break;
       case OPERATOR:
-	curprecedence = get_precedence(tokens->token);
-	if (uninitialised_index_table) {
-	  uninitialised_index_table = false;
-	  // !! Type depends on MAX_PRECEDENCE !!
-	  for (unsigned char i = 0; i < MAX_PRECEDENCE; i++)
-	    precedence_index_table[i] = curprecedence.precedence;
+        curprecedence = get_precedence(tokens->token);
+        if (uninitialised_index_table) {
+          uninitialised_index_table = false;
+          // !! Type depends on MAX_PRECEDENCE !!
+          for (unsigned char i = 0; i < MAX_PRECEDENCE; i++)
+            precedence_index_table[i] = curprecedence.precedence;
 
-	  ASTNode* new_bin_expr = new_vector_with_capacity(*new_bin_expr, 1);
-	  new_bin_expr->type = BIN_EXPRESSION;
-	  new_bin_expr->bin_expression.left_expression = curexpr;
-	  curexpr = new_vector_with_capacity(*curexpr, 8);
-	  new_bin_expr->bin_expression.right_expression = curexpr;
+          ASTNode* new_bin_expr = new_vector_with_capacity(*new_bin_expr, 1);
+          new_bin_expr->type = BIN_EXPRESSION;
+          new_bin_expr->bin_expression.left_expression = curexpr;
+          curexpr = new_vector_with_capacity(*curexpr, 8);
+          new_bin_expr->bin_expression.right_expression = curexpr;
           waiting_rightexpr = true;
 
-	  precedence_table[curprecedence.precedence] = (PrecEntry) {
-	    .info = curprecedence,
-	    .node = new_bin_expr
-	  };
-	  break;
-	}
+          precedence_table[curprecedence.precedence] = (PrecEntry) {
+            .info = curprecedence,
+            .node = new_bin_expr
+          };
+          break;
+        }
 
-	belowprecnode = precedence_table[precedence_index_table[curprecedence.precedence]];
+        belowprecnode = precedence_table[precedence_index_table[curprecedence.precedence]];
 
 
         if (curprecedence.precedence == belowprecnode.info.precedence && curprecedence.is_infixr != belowprecnode.info.is_infixr) {
@@ -155,7 +155,7 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
           push(error_buf, mkerr(PARSER, tokens->line, tokens->index, "Unmatched parenthesis before semicolon"));
           expr_stack_top = 0;
         }
-	push(ast, *curexpr); // push root node
+        push(ast, *curexpr); // push root node
         curexpr = new_vector_with_capacity(*curexpr, 8);
       case COMMENT:
         break;

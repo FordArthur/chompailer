@@ -1,5 +1,4 @@
 #include "compiler_inner_types.h"
-#include <stdio.h>
 
 #define RESET   "\033[0m"
 #define BLACK   "\033[30m"      /* Black */

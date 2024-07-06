@@ -1,4 +1,6 @@
 #include "chompailer.h"
+#include "parser.h"
+#include "vec.h"
 
 int main(int argc, char *argv[]) {
   if (argc != 3) {
@@ -18,8 +20,25 @@ int main(int argc, char *argv[]) {
       }
       break;
     }
-    case 'p':
-      printf("Unimplemented, sorry!\n");
+    case 'p': {
+      Tokens stream = scanner(argv[2]);
+      if (!stream.is_correct_stream) {
+        for_each(i, stream.error_buf)
+          report_error(stream.error_buf[i], stream.lines);
+        return 1;
+      }
+      AST ast = parser(stream.scanned.token_stream, stream.scanned.infixes, stream.error_buf);
+      if (!ast.is_correct_ast) {
+        for_each(i, stream.error_buf)
+          report_error(stream.error_buf[i], stream.lines);
+        return 1;
+      }
+      for_each(i, ast.ast)
+        print_AST(ast.ast + i);
+
       break;
+    }
+
   }
+  return 0;
 }

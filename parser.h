@@ -26,7 +26,7 @@ typedef enum ASTType {
   BIN_EXPRESSION,
   DECLARATION,
   F_DEFINITION,
-  V_DEFINIITON,
+  V_DEFINITION,
 } ASTType;
 
 typedef struct ASTNode {
