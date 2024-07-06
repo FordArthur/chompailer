@@ -17,7 +17,7 @@ typedef struct Error {
   char* err;
 } Error;
 
-void report_error(const Error err, char** lines);
+void report_error(const Error* err, char** lines);
 
 #define Malloc malloc
 #define Free free

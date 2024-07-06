@@ -7,8 +7,8 @@ static unsigned long _LINE = 1;
 
 static char** _LINES;
 
-void print_token(Token tok) {
-  printf("\t|\n    %lu\t| %s (%d)\n\t| ^\n\t  %lu - %lu\n\n", tok.line, tok.token, tok.type, tok.index, tok.length);
+void print_token(Token* tok) {
+  printf("\t|\n    %lu\t| %s (%d)\n\t| ^\n\t  %lu - %lu\n\n", tok->line, tok->token, tok->type, tok->index, tok->length);
 }
 
 // Size must not take into account null delimiter

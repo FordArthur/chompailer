@@ -6,7 +6,7 @@ OBJ = $(SRC:.c=.o)
 
 all: $(EXEC_FILE)
 
-debug: CCFLAGS += -ggdb -g
+debug: CCFLAGS += -ggdb -g -D DEBUG
 debug: $(OBJ) 
 	$(CC) $^ -o $(EXEC_FILE)
 	

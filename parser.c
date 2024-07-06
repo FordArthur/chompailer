@@ -27,7 +27,6 @@ void print_AST(ASTNode* ast) {
         print_AST(ast + i);
         printf(" ");
       }
-      printf("\n");
       break;
     case BIN_EXPRESSION:
       print_AST(ast->bin_expression.operator);
@@ -41,21 +40,26 @@ void print_AST(ASTNode* ast) {
     case V_DEFINITION:
       break;
   }
+  printf("\n");
 }
 
 AST parser(Token* tokens, Token** infixes, Error* error_buf) {
   ASTNode* ast = new_vector_with_capacity(*ast, 16);
   bool is_correct_ast = true;
 
+  // have something where instead of pushing this it pushes that thing which points to curexpr
+  // or something
   ASTNode* curexpr = new_vector_with_capacity(*curexpr, 8);
+  ASTNode root;
+  root.type = EXPRESSION;
   bool waiting_rightexpr = false;
 
   bool uninitialised_index_table = true;
   // !! Type depends on MAX_PRECEDENCE !!
   unsigned char precedence_index_table[MAX_PRECEDENCE];
   PrecEntry precedence_table[MAX_PRECEDENCE] = {0}; // It can store up to MAX_PRECEDENCE/2 tokens
-  // since we only track of the lowest and highest
-  // tokens in any precedence succession
+						    // since we only track of the lowest and highest
+						    // tokens in any precedence succession
 
   ASTNode* expr_stack[MAX_PARENTHESIS] = {0}; // Here we utilize the entire size 
 
@@ -64,42 +68,70 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
 
   PrecInfo curprecedence;
   PrecEntry belowprecnode;
+  
 
   // Build table for infixes
   // ...
 
   // Iterate over tokens
   for (; tokens->type != _EOF; tokens++) {
+#ifdef DEBUG
+  bool printable = true;
+#endif
     switch (tokens->type) {
       case OPEN_PAREN:
+#ifdef DEBUG
+	printf("OPEN_PAREN\n");
+#endif
         expr_stack_top++;
         expr_stack[expr_stack_top] = curexpr;
         curexpr = new_vector_with_capacity(*curexpr, 8);
         break;
       case CLOSE_PAREN:
+#ifdef DEBUG
+	printf("CLOSE_PAREN\n");
+#endif
         // if expr_stack_top == 0 then err
         expr_stack_top--;
         push(expr_stack[expr_stack_top], *curexpr); // actually, push root node of the popped expr
         curexpr = expr_stack[expr_stack_top];
         break;
       case NATURAL:
+#ifdef DEBUG
+	printf("NATURAL\n");
+#endif
         push(curexpr, token_to_term(TNATURAL, (*tokens)));
         break;
       case REAL:
+#ifdef DEBUG
+	printf("REAL\n");
+#endif
         push(curexpr, token_to_term(TREAL, (*tokens)));
         break;
       case CHARACTER:
+#ifdef DEBUG
+	printf("CHARACTER\n");
+#endif
         push(curexpr, token_to_term(TCHARACTER, (*tokens)));
         break;
       case STRING:
+#ifdef DEBUG
+	printf("STRING\n");
+#endif
         push(curexpr, token_to_term(TSTRING, (*tokens)));
         break;
       case IDENTIFIER:
+#ifdef DEBUG
+	printf("IDENTIFIER (%s)\n", tokens->token);
+#endif
         // Could be a variable as well!
         // (i.e. could be a function just that has type `a`)
         push(curexpr, token_to_term(FUNCTION, (*tokens)));
         break;
       case OPERATOR:
+#ifdef DEBUG
+	printf("OPERATOR\n");
+#endif
         curprecedence = get_precedence(tokens->token);
         if (uninitialised_index_table) {
           uninitialised_index_table = false;
@@ -155,10 +187,26 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
           push(error_buf, mkerr(PARSER, tokens->line, tokens->index, "Unmatched parenthesis before semicolon"));
           expr_stack_top = 0;
         }
-        push(ast, *curexpr); // push root node
+	root.expression = curexpr;
+        push(ast, root);
         curexpr = new_vector_with_capacity(*curexpr, 8);
+#ifdef DEBUG
+	printable = false;
+#endif
+	break;
       case COMMENT:
         break;
     }
+#ifdef DEBUG
+    if (printable) {
+	print_AST(curexpr);
+	printf("---\n");
+    }
+#endif
   }
+  return (AST) {
+	.is_correct_ast = is_correct_ast,
+	.ast = ast,
+	.error_buf = error_buf
+  };
 }

@@ -13,10 +13,10 @@ int main(int argc, char *argv[]) {
 
       if (stream.is_correct_stream) {
         for_each(i, stream.scanned.token_stream)
-        print_token(stream.scanned.token_stream[i]);
+        print_token(stream.scanned.token_stream + i);
       } else {
         for_each(i, stream.error_buf)
-        report_error(stream.error_buf[i], stream.lines);
+        report_error(stream.error_buf + i, stream.lines);
       }
       break;
     }
@@ -24,13 +24,17 @@ int main(int argc, char *argv[]) {
       Tokens stream = scanner(argv[2]);
       if (!stream.is_correct_stream) {
         for_each(i, stream.error_buf)
-          report_error(stream.error_buf[i], stream.lines);
+          report_error(stream.error_buf + i, stream.lines);
         return 1;
       }
+#ifdef DEBUG
+      for_each(i, stream.scanned.token_stream)
+	print_token(stream.scanned.token_stream + i);
+#endif
       AST ast = parser(stream.scanned.token_stream, stream.scanned.infixes, stream.error_buf);
       if (!ast.is_correct_ast) {
         for_each(i, stream.error_buf)
-          report_error(stream.error_buf[i], stream.lines);
+          report_error(stream.error_buf + i, stream.lines);
         return 1;
       }
       for_each(i, ast.ast)
