@@ -42,5 +42,5 @@ unsigned long follow_pattern_with_default(char* pattern, TrieNode* trie, unsigne
       return _default;
     node = node->children[*subpattern - TRIE_ASCII_OFFSET];
   }
-  return node->value != -1? node->value : _default;
+  return node->value;
 }

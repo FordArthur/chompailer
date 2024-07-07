@@ -2,8 +2,9 @@
 
 #define token_to_term(termtype, tok) (ASTNode) {.type = TERM, .term.type = termtype, .term.index = tok.index, .term.line = tok.line, .term.length = tok.length, .term.name = tok.token}
 
+ // !! It's really important that the size of this struct isnt greater than unsigned long !!
 typedef struct PrecInfo {
-  unsigned long precedence;
+  unsigned int precedence;
   bool is_infixr;
 } PrecInfo;
 
@@ -12,9 +13,23 @@ typedef struct PrecEntry {
   ASTNode* node;
 } PrecEntry;
 
+static TrieNode* precedence_trie;
 
-inline PrecInfo get_precedence(const char* name) {
-  // ...
+static inline unsigned long mkPrecInfo(unsigned int precedence, bool is_infixr) {
+  PrecInfo precinfo = (PrecInfo) {.precedence = precedence, .is_infixr = is_infixr};
+  return *(unsigned long*) &precinfo;
+}
+
+static inline PrecInfo get_precedence(char* name) {
+  // TODO: Emit warning when not in trie
+#ifdef DEBUG
+  printf("Searching for %s in precedence trie:\n", name);
+  print_trie(precedence_trie);
+  fflush(stdout);
+#endif
+  PrecInfo _default = (PrecInfo) { .precedence = 6, .is_infixr = false };
+  unsigned long res = follow_pattern_with_default(name, precedence_trie, *(unsigned long*) &_default);
+  return *(PrecInfo*) &res;
 }
 
 void print_AST(ASTNode* ast) {
@@ -44,14 +59,13 @@ void print_AST(ASTNode* ast) {
 }
 
 AST parser(Token* tokens, Token** infixes, Error* error_buf) {
+  _Static_assert(sizeof(PrecInfo) <= 8, L"Cannot fit PrecInfo into unsigned long");
   ASTNode* ast = new_vector_with_capacity(*ast, 16);
   bool is_correct_ast = true;
 
   // have something where instead of pushing this it pushes that thing which points to curexpr
   // or something
   ASTNode* curexpr = new_vector_with_capacity(*curexpr, 8);
-  ASTNode root;
-  root.type = EXPRESSION;
   bool waiting_rightexpr = false;
 
   bool uninitialised_index_table = true;
@@ -69,10 +83,11 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
   PrecInfo curprecedence;
   PrecEntry belowprecnode;
   
-
-  // Build table for infixes
+  precedence_trie = create_node(0, -1);
+  insert_trie("+", mkPrecInfo(5, false), precedence_trie);
+  insert_trie("*", mkPrecInfo(5, false), precedence_trie);
   // ...
-
+  
   // Iterate over tokens
   for (; tokens->type != _EOF; tokens++) {
 #ifdef DEBUG
@@ -130,7 +145,7 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
         break;
       case OPERATOR:
 #ifdef DEBUG
-	printf("OPERATOR\n");
+	printf("OPERATOR (%s)\n", tokens->token);
 #endif
         curprecedence = get_precedence(tokens->token);
         if (uninitialised_index_table) {
@@ -152,7 +167,16 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
           };
           break;
         }
+#ifdef DEBUG
+	printf("Precedence_index_table: [");
+	for (unsigned char i = 0; i < MAX_PRECEDENCE; i++) {
+	  printf("%d, ", precedence_index_table[i]);
+	}
+	printf("]\n");
+	fflush(stdout);
+#endif
 
+	printf("\\OPERATOR\n");
         belowprecnode = precedence_table[precedence_index_table[curprecedence.precedence]];
 
 
@@ -179,6 +203,7 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
           waiting_rightexpr = true;
         }
 
+	printf("\\OPERATOR\n");
 
         break;
       case SEMI_COLON:
@@ -187,13 +212,11 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
           push(error_buf, mkerr(PARSER, tokens->line, tokens->index, "Unmatched parenthesis before semicolon"));
           expr_stack_top = 0;
         }
-	root.type = EXPRESSION;
-	root.expression = curexpr;
 #ifdef DEBUG
 	print_AST(curexpr);
 	printf("- - -\n");
 #endif
-        push(ast, root);
+        push(ast, *(uninitialised_index_table? curexpr : precedence_table[precedence_index_table[0]].node));
         curexpr = new_vector_with_capacity(*curexpr, 8);
 #ifdef DEBUG
 	printable = false;

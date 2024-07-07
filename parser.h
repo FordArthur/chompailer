@@ -1,12 +1,13 @@
 #ifndef CHORILANG_PARSER_HEADER
 #define CHORILANG_PARSER_HEADER
 
+#include "trie.h"
 #include "scanner.h"
 #include "compiler_inner_types.h"
 
 // !! Actual max precedence is halved !!
-#define MAX_PRECEDENCE 256
-#define MAX_PARENTHESIS 256
+#define MAX_PRECEDENCE 255
+#define MAX_PARENTHESIS 255
 
 typedef enum TermType {
   FUNCTION,
@@ -68,7 +69,6 @@ typedef struct AST {
   ASTNode* ast;
   Error* error_buf;
 } AST;
-
 
 void print_AST(ASTNode* ast);
 
