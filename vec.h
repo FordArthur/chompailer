@@ -29,5 +29,6 @@ vect_h* _get_header(void* vect);
 }\
 
 #define for_each(i, v) for (unsigned int i = 0, m = _get_header(v)->size; i < m; i++)
+#define vector_last(v) (v[_get_header(v)->size - 1])
 
 #endif // !INSITUCS_VECTOR_HEADER

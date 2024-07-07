@@ -24,7 +24,7 @@ void print_AST(ASTNode* ast) {
       break;
     case EXPRESSION:
       for_each(i, ast->expression) {
-        print_AST(ast + i);
+        print_AST(ast->expression + i);
         printf(" ");
       }
       break;
@@ -187,7 +187,12 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
           push(error_buf, mkerr(PARSER, tokens->line, tokens->index, "Unmatched parenthesis before semicolon"));
           expr_stack_top = 0;
         }
+	root.type = EXPRESSION;
 	root.expression = curexpr;
+#ifdef DEBUG
+	print_AST(curexpr);
+	printf("- - -\n");
+#endif
         push(ast, root);
         curexpr = new_vector_with_capacity(*curexpr, 8);
 #ifdef DEBUG
@@ -199,7 +204,7 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
     }
 #ifdef DEBUG
     if (printable) {
-	print_AST(curexpr);
+	print_AST(ast);
 	printf("---\n");
     }
 #endif

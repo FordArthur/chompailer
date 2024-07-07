@@ -17,7 +17,6 @@ typedef enum TokenType {
   CHARACTER, STRING,
   IDENTIFIER, OPERATOR, TYPE_K,
 
-  LINE,
   SEMI_COLON,
   DOUBLE_COLON,
   COMA,

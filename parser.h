@@ -74,4 +74,4 @@ void print_AST(ASTNode* ast);
 
 AST parser(Token* tokens, Token** infixes, Error* error_buf);
 
-#endif  // !CHORILANG_PARSER_HEADER
+#endif // !CHORILANG_PARSER_HEADER

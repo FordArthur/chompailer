@@ -68,10 +68,75 @@ Tokens scanner(char *stream) {
   // This is fine, what we want to store in this vector is pointers, not structures
   Token** infixes = new_vector_with_capacity(*infixes, 8); // NOLINT(bugprone-sizeof-expression)
 
+  TrieNode* syntax_trie = create_node(0, -1);
+#ifdef DEBUG
+  printf("Syntax trie:\n");
+  print_trie(syntax_trie);
+#endif
+  insert_trie("::", DOUBLE_COLON, syntax_trie);
+#ifdef DEBUG
+  printf("Syntax trie:\n");
+  print_trie(syntax_trie);
+#endif
+  insert_trie("=", EQUALS, syntax_trie);
+#ifdef DEBUG
+  printf("Syntax trie:\n");
+  print_trie(syntax_trie);
+#endif
+  insert_trie("|", BAR, syntax_trie);
+#ifdef DEBUG
+  printf("Syntax trie:\n");
+  print_trie(syntax_trie);
+#endif
+  insert_trie("*", STAR, syntax_trie);
+#ifdef DEBUG
+  printf("Syntax trie:\n");
+  print_trie(syntax_trie);
+#endif
+  insert_trie("&", AMPERSAND, syntax_trie);
+#ifdef DEBUG
+  printf("Syntax trie:\n");
+  print_trie(syntax_trie);
+#endif
+  insert_trie("||", DOUBLE_BAR, syntax_trie);
+#ifdef DEBUG
+  printf("Syntax trie:\n");
+  print_trie(syntax_trie);
+#endif
+  insert_trie("&&", DOUBLE_AMPERSAND, syntax_trie);
+#ifdef DEBUG
+  printf("Syntax trie:\n");
+  print_trie(syntax_trie);
+#endif
+  insert_trie(":=", CONSTANT_DEFINE, syntax_trie);
+#ifdef DEBUG
+  printf("Syntax trie:\n");
+  print_trie(syntax_trie);
+#endif
+  insert_trie("if", IF, syntax_trie);
+#ifdef DEBUG
+  printf("Syntax trie:\n");
+  print_trie(syntax_trie);
+#endif
+  insert_trie("then", THEN, syntax_trie);
+#ifdef DEBUG
+  printf("Syntax trie:\n");
+  print_trie(syntax_trie);
+#endif
+  insert_trie("else", ELSE, syntax_trie);
+#ifdef DEBUG
+  printf("Syntax trie:\n");
+  print_trie(syntax_trie);
+#endif
+  insert_trie("let", LET, syntax_trie);
+#ifdef DEBUG
+  printf("Syntax trie:\n");
+  print_trie(syntax_trie);
+#endif
+
   for (char curchar; (curchar = consume(&stream));) {
     switch (curchar) {
       case ' ':
-      case ',':
       case '\n':
       case '\t':
         continue;
@@ -111,6 +176,11 @@ Tokens scanner(char *stream) {
           mktok(CLOSE_CURLY, _LINE, _INDEX, 1, NULL)
         );
         break;
+      case ',':
+        push(
+          token_stream, 
+          mktok(COMA, _LINE, _INDEX, 1, NULL)
+        );
       case ';':
         push(
           token_stream, 
@@ -255,7 +325,7 @@ Tokens scanner(char *stream) {
 
         push(
           token_stream, 
-          mktok(isupper(*start_token)? TYPE_K : is_alnum? IDENTIFIER : OPERATOR, _LINE, index, size, start_token)
+          mktok(isupper(*start_token)? TYPE_K : follow_pattern_with_default(start_token, syntax_trie, is_alnum? IDENTIFIER : OPERATOR), _LINE, index, size, start_token)
         //      ^-------------------------------------------------------------- type should be stored somewhere so it
         //                                                                      can be added to the infixes if appropiate
         );
