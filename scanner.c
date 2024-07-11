@@ -73,6 +73,8 @@ Tokens scanner(char *stream) {
   insert_trie("=", EQUALS, syntax_trie);
   insert_trie("|", BAR, syntax_trie);
   insert_trie("&", AMPERSAND, syntax_trie);
+  insert_trie("->", ARROW, syntax_trie);
+  insert_trie("=>", DOUBLE_ARROW, syntax_trie);
   insert_trie("||", DOUBLE_BAR, syntax_trie);
   insert_trie("&&", DOUBLE_AMPERSAND, syntax_trie);
   insert_trie(":=", CONSTANT_DEFINE, syntax_trie);
@@ -135,6 +137,7 @@ Tokens scanner(char *stream) {
           token_stream, 
           mktok(COMA, _LINE, _INDEX, 1, NULL)
         );
+      break;
       case ';':
         push(
           token_stream, 

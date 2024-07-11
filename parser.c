@@ -1,10 +1,4 @@
 #include "parser.h"
-#include "compiler_inner_types.h"
-#include "scanner.h"
-#include "trie.h"
-#include "vec.h"
-#include <stdbool.h>
-#include <stdio.h>
 
 #define token_to_term(termtype, tok) (ASTNode) {.type = TERM, .term.type = termtype, .term.index = tok.index, .term.line = tok.line, .term.length = tok.length, .term.name = tok.token}
 
@@ -88,15 +82,14 @@ void _print_AST(volatile ASTNode* ast, unsigned long tab) {
       _print_AST(ast->function_definition.declaration, tab);
       printf("\n");
       for_each(i, ast->function_definition.implementations)
-        _print_AST(ast->function_definition.implementations + i, tab);
+      _print_AST(ast->function_definition.implementations + i, tab);
       break;
   }
 }
 
 AST parser(Token* tokens, Token** infixes, Error* error_buf) {
-
   _Static_assert(sizeof(PrecInfo) <= sizeof(unsigned long), "Cannot fit PrecInfo into unsigned long");
-  
+
   TrieNode* ASTrie = create_node(0, -1);
 
   ASTNode* expressions = NULL;
@@ -129,6 +122,10 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
   // Iterate over tokens
   for (; tokens->type != _EOF; tokens++) {
     if (expecting_type && (tokens->type != TYPE_K && tokens->type != IDENTIFIER)) {
+#ifdef DEBUG
+      printf("Got: %d\n", tokens->type);
+
+#endif /* ifdef DEBUG */
       is_correct_ast = false;
       push(
         error_buf, 
@@ -173,6 +170,7 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
         }
         is_parsing_type = false;
         expecting_type = true;
+        break;
       case COMA:
         if (is_parsing_type)
           expecting_type = true;
@@ -209,7 +207,7 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
       TYPE:
         push(curexpr, token_to_term(TYPE, (*tokens)));
         expecting_type = false;
-      break;
+        break;
       case IDENTIFIER:
 #ifdef DEBUG
       printf("IDENTIFIER (%s)\n", tokens->token);
@@ -239,8 +237,8 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
         bool in_root = true;
         while (
           above_node->type == BIN_EXPRESSION 
-        && get_precedence(above_node->bin_expression.op->term.name).prec 
-            + curprec.is_infixr * (curprec.prec == get_precedence(above_node->bin_expression.op->term.name).prec) 
+          && get_precedence(above_node->bin_expression.op->term.name).prec 
+          + curprec.is_infixr * (curprec.prec == get_precedence(above_node->bin_expression.op->term.name).prec) 
           > curprec.prec
         ) {
 #ifdef DEBUG
@@ -269,10 +267,7 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
           push(error_buf, mkerr(PARSER, tokens->line, tokens->index, "Unmatched parenthesis before semicolon"));
           expr_stack_top = 0;
         }
-        if (!expressions) {
-          is_correct_ast = false;
-          push(error_buf, mkerr(PARSER, tokens->line, tokens->index, "Extraneous expression (Outside a function definition)"));
-        } else if (!is_parsing_type)
+        if (expressions)
           push(expressions, *root);
         restart_expression(&curexpr, &curexpr_ptr);
         root = curexpr_ptr;
@@ -348,6 +343,7 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
           def->function_definition.implementations = new_vector_with_capacity(*def->function_definition.implementations, 4);
           insert_trie(name, (unsigned long) def, ASTrie);
         }
+        expressions = new_vector_with_capacity(*expressions, 16);
         break;
       }
       case COMMENT:
@@ -360,3 +356,9 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
     .error_buf = error_buf
   };
 }
+
+/* 
+ * To fix:
+ * without an arrow, it just keeps thinking everything is a type
+ * add lets to astrie
+ */
