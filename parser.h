@@ -6,7 +6,6 @@
 #include "compiler_inner_types.h"
 
 // !! Actual max precedence is halved !!
-#define MAX_PRECEDENCE 255
 #define MAX_PARENTHESIS 255
 
 typedef enum TermType {
@@ -26,8 +25,9 @@ typedef enum ASTType {
   EXPRESSION,
   BIN_EXPRESSION,
   DECLARATION,
-  F_DEFINITION,
+  IMPLEMENTATION,
   V_DEFINITION,
+  F_DEFINITION,
 } ASTType;
 
 typedef struct ASTNode {
@@ -40,25 +40,26 @@ typedef struct ASTNode {
       unsigned long length;
       char* name;
     } term;
-    struct ASTNode* expression; // first is function rest is arguments
+    struct ASTNode* expression; // First is function rest is arguments
     struct {
-      struct ASTNode* operator;
+      struct ASTNode* op;
       struct ASTNode* left_expression;
       struct ASTNode* right_expression;
     } bin_expression;
     struct {
       struct ASTNode* expression;
-      struct ASTNode** type;
+      struct ASTNode* type;
     } declaration;
     struct {
-      char* name;
-      struct {
-        struct ASTNode* arguments;
-        struct ASTNode* implementation;
-      } body;
+      struct ASTNode* arguments;
+      struct ASTNode* body;
+    } implementation;
+    struct {
+      struct ASTNode* declaration;
+      struct ASTNode* implementations;
     } function_definition;
     struct {
-      char* name;
+      struct ASTNode* arguments; // Null if none, i.e. if value
       struct ASTNode* expression;
     } variable_definition;
   };
@@ -66,11 +67,12 @@ typedef struct ASTNode {
 
 typedef struct AST {
   bool is_correct_ast;
-  ASTNode* ast;
+  TrieNode* astrie;
   Error* error_buf;
 } AST;
 
-void print_AST(ASTNode* ast);
+#define print_AST(ast) _print_AST(ast, 0)
+void _print_AST(volatile ASTNode* ast, unsigned long spacing);
 
 AST parser(Token* tokens, Token** infixes, Error* error_buf);
 

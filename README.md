@@ -6,7 +6,14 @@ Chorilang's syntax is similar to Haskell's:
 
 
 ```haskell
-main :: .io ()                  // Use the .io modifier to use IO
-main = print "Hello World!\n"   // You may also put a semicolon at the end of expressions
+let my_global_var = "local vars are declared the same, but im not convinced in let syntax for globals";
+let my_global_var_with_types :: WayOfTypingVars = expression :: AnotherWayOfTypingVars; // They are (will) be equivalent because of the typechecker
 
+func :: Type, Type, Type -> Type
+func arg1 arg2 arg3 = expression1; // (Comments are actually C style, just using Haskell coments for the highlighting)
+                          expression2; // lines dont matter, nor indentation
+                          exp;
+                          return_expression;
+main :: IO Unit
+main = exp;
 ```

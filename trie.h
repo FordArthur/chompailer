@@ -21,5 +21,6 @@ void _print_trie(TrieNode* trie, unsigned long spacing);
 TrieNode* create_node(char key, unsigned long value);
 bool insert_trie(char* pattern, unsigned long final_value, TrieNode* trie);
 unsigned long follow_pattern_with_default(char* pattern, TrieNode* trie, unsigned long _default);
+void for_each_in_trie(TrieNode* trie, void (*func)(unsigned long value));
 
 #endif  // !CHORILANG_TRIE_HEADER

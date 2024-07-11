@@ -1,10 +1,4 @@
-#include <stdlib.h>
-
-typedef struct Vector_Header {
-  unsigned int obj_size;
-  unsigned int capacity;
-  unsigned int size;
-} vect_h;
+#include "vec.h"
 
 void* _new_vector(unsigned int obj_size, unsigned int capacity) {
   vect_h* vp = malloc( sizeof(vect_h) + obj_size * capacity );

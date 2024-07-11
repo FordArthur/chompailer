@@ -1,6 +1,8 @@
 #include "chompailer.h"
-#include "parser.h"
-#include "vec.h"
+
+void print_AST_lam(unsigned long astrie) {
+  print_AST((ASTNode*) astrie);
+}
 
 int main(int argc, char *argv[]) {
   if (argc != 3) {
@@ -37,9 +39,10 @@ int main(int argc, char *argv[]) {
           report_error(stream.error_buf + i, stream.lines);
         return 1;
       }
-      for_each(i, ast.ast)
-        print_AST(ast.ast + i);
-
+#ifdef DEBUG 
+      print_trie(ast.astrie);
+#endif
+      for_each_in_trie(ast.astrie, &print_AST_lam);
       break;
     }
 

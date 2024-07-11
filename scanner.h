@@ -23,7 +23,6 @@ typedef enum TokenType {
   EQUALS,
   LAMBDA, // Either \ or λ
   BAR,
-  STAR,
   AMPERSAND,
   DOUBLE_BAR,
   DOUBLE_AMPERSAND,

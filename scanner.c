@@ -69,65 +69,16 @@ Tokens scanner(char *stream) {
   Token** infixes = new_vector_with_capacity(*infixes, 8); // NOLINT(bugprone-sizeof-expression)
 
   TrieNode* syntax_trie = create_node(0, -1);
-#ifdef DEBUG
-  printf("Syntax trie:\n");
-  print_trie(syntax_trie);
-#endif
   insert_trie("::", DOUBLE_COLON, syntax_trie);
-#ifdef DEBUG
-  printf("Syntax trie:\n");
-  print_trie(syntax_trie);
-#endif
   insert_trie("=", EQUALS, syntax_trie);
-#ifdef DEBUG
-  printf("Syntax trie:\n");
-  print_trie(syntax_trie);
-#endif
   insert_trie("|", BAR, syntax_trie);
-#ifdef DEBUG
-  printf("Syntax trie:\n");
-  print_trie(syntax_trie);
-#endif
-  insert_trie("*", STAR, syntax_trie);
-#ifdef DEBUG
-  printf("Syntax trie:\n");
-  print_trie(syntax_trie);
-#endif
   insert_trie("&", AMPERSAND, syntax_trie);
-#ifdef DEBUG
-  printf("Syntax trie:\n");
-  print_trie(syntax_trie);
-#endif
   insert_trie("||", DOUBLE_BAR, syntax_trie);
-#ifdef DEBUG
-  printf("Syntax trie:\n");
-  print_trie(syntax_trie);
-#endif
   insert_trie("&&", DOUBLE_AMPERSAND, syntax_trie);
-#ifdef DEBUG
-  printf("Syntax trie:\n");
-  print_trie(syntax_trie);
-#endif
   insert_trie(":=", CONSTANT_DEFINE, syntax_trie);
-#ifdef DEBUG
-  printf("Syntax trie:\n");
-  print_trie(syntax_trie);
-#endif
   insert_trie("if", IF, syntax_trie);
-#ifdef DEBUG
-  printf("Syntax trie:\n");
-  print_trie(syntax_trie);
-#endif
   insert_trie("then", THEN, syntax_trie);
-#ifdef DEBUG
-  printf("Syntax trie:\n");
-  print_trie(syntax_trie);
-#endif
   insert_trie("else", ELSE, syntax_trie);
-#ifdef DEBUG
-  printf("Syntax trie:\n");
-  print_trie(syntax_trie);
-#endif
   insert_trie("let", LET, syntax_trie);
 #ifdef DEBUG
   printf("Syntax trie:\n");
@@ -135,6 +86,9 @@ Tokens scanner(char *stream) {
 #endif
 
   for (char curchar; (curchar = consume(&stream));) {
+#ifdef DEBUG
+    printf("%s", stream);
+#endif
     switch (curchar) {
       case ' ':
       case '\n':
@@ -323,12 +277,20 @@ Tokens scanner(char *stream) {
 
         start_token = reserve_token(size = stream - start_token, start_token);
 
-        push(
-          token_stream, 
-          mktok(isupper(*start_token)? TYPE_K : follow_pattern_with_default(start_token, syntax_trie, is_alnum? IDENTIFIER : OPERATOR), _LINE, index, size, start_token)
-        //      ^-------------------------------------------------------------- type should be stored somewhere so it
-        //                                                                      can be added to the infixes if appropiate
-        );
+          vect_h* header = _get_header(token_stream);
+          token_stream[header->size] = mktok(isupper(*start_token)? TYPE_K : follow_pattern_with_default(start_token, syntax_trie, is_alnum? IDENTIFIER : OPERATOR), _LINE, index, size, start_token);
+          header->size++;
+          if (header->size == header->capacity) {
+            header->capacity += CAPACITY;
+            header = realloc(header, sizeof(vect_h) + header->capacity * header->obj_size);
+            token_stream = (void*) (header + 1);
+          }
+        // push(
+        //   token_stream, 
+        //   mktok(isupper(*start_token)? TYPE_K : follow_pattern_with_default(start_token, syntax_trie, is_alnum? IDENTIFIER : OPERATOR), _LINE, index, size, start_token)
+        // //      ^-------------------------------------------------------------- type should be stored somewhere so it
+        // //                                                                      can be added to the infixes if appropiate
+        // );
 
         break;
       }

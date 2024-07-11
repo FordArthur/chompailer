@@ -10,6 +10,15 @@ void _print_trie(TrieNode* trie, unsigned long spacing) {
     _print_trie(trie->children[i], spacing + 1);
 }
 
+void for_each_in_trie(TrieNode* trie, void (*func)(unsigned long value)) {
+  if (!trie)
+    return;
+  if (trie->value != (unsigned long) -1)
+    (*func)(trie->value);
+  for (unsigned long i = 0; i < TRIE_LOOK_UP_SIZE; i++)
+    for_each_in_trie(trie->children[i], func);
+}
+
 TrieNode* create_node(char key, unsigned long value) {
   TrieNode* new_node = malloc(sizeof(*new_node));
   new_node->key = key;
