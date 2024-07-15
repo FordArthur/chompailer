@@ -2,6 +2,7 @@
 #define CHOMPILER_INNER_TYPES
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 
 #define mkerr(_type, _line, _index, _err) ((Error) {.type = _type, .line = _line, .index = _index, .err = _err}) 

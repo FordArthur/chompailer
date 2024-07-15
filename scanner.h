@@ -1,5 +1,5 @@
-#ifndef CHOMPAILER_SCANNER
-#define CHOMPAILER_SCANNER
+#ifndef CHOMPAILER_SCANNER_HEADER
+#define CHOMPAILER_SCANNER_HEADER
 
 #include <ctype.h>
 #include <stdbool.h>
@@ -33,10 +33,13 @@ typedef enum TokenType {
   THEN,
   ELSE,
   LET,
+  DATA,
+  INSTANCE,
+  CLASS, // Not supported, for now
+  INFIXL,
+  INFIXR,
 
   COMMENT,
-
-  _EOF
 } TokenType;
 
 typedef struct Token {
@@ -70,6 +73,7 @@ typedef struct Tokens {
  */
 
 Tokens scanner(char* stream);
+
 void print_token(Token* tok);
 
-#endif  // !CHOMPAILER_SCANNER
+#endif  // !CHOMPAILER_SCANNER_HEADER

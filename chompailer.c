@@ -2,6 +2,7 @@
 
 void print_AST_lam(unsigned long astrie) {
   print_AST((ASTNode*) astrie);
+  printf("\n");
 }
 
 int main(int argc, char *argv[]) {

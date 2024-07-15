@@ -16,6 +16,7 @@ typedef enum TermType {
   TCHARACTER,
   TSTRING,
   TYPE_CONSTRUCTOR,
+  HIGHER_ORDER_TYPE,
 
   TYPE,
 } TermType;
@@ -24,12 +25,17 @@ typedef enum ASTType {
   TERM,
   EXPRESSION,
   BIN_EXPRESSION,
+  FORMAL_TYPE,
   DECLARATION,
   IMPLEMENTATION,
   V_DEFINITION,
   F_DEFINITION,
+  DATA_DECLARATION,
+  INSTANCE_DEFINITION,
+  CLASS_DECLARATION,
 } ASTType;
 
+// Fields suffixed with _v are vectors
 typedef struct ASTNode {
   ASTType type;
   union {
@@ -40,39 +46,55 @@ typedef struct ASTNode {
       unsigned long length;
       char* name;
     } term;
-    struct ASTNode* expression; // First is function rest is arguments
+    struct ASTNode* expression_v;
     struct {
       struct ASTNode* op;
-      struct ASTNode* left_expression;
-      struct ASTNode* right_expression;
+      struct ASTNode* left_expression_v;
+      struct ASTNode* right_expression_v;
     } bin_expression;
     struct {
-      struct ASTNode* expression;
-      struct ASTNode* type;
+      struct ASTNode** constraints_v_v;
+      struct ASTNode* type_v;
+    } formal_type;
+    struct {
+      struct ASTNode* expression_v;
+      struct ASTNode* type_v;
     } declaration;
     struct {
-      struct ASTNode* arguments;
-      struct ASTNode* body;
+      struct ASTNode* arguments_v;
+      struct ASTNode* body_v;
     } implementation;
     struct {
       struct ASTNode* declaration;
-      struct ASTNode* implementations;
+      struct ASTNode* implementations_v;
     } function_definition;
     struct {
-      struct ASTNode* arguments; // Null if none, i.e. if value
+      struct ASTNode* arguments_v;
       struct ASTNode* expression;
     } variable_definition;
+    struct {
+      struct ASTNode* constraints;
+      struct ASTNode** decl_v;
+    } data_declaration;
+    struct {
+      struct ASTNode* instance_type;
+      struct ASTNode* implementations_v;
+    } instance_definition;
+    struct {
+      struct ASTNode* instance_type;
+      struct ASTNode* declarations_v;
+    } class_declaration;
   };
 } ASTNode;
 
 typedef struct AST {
   bool is_correct_ast;
   TrieNode* astrie;
+  TrieNode* type_trie;
   Error* error_buf;
 } AST;
 
-#define print_AST(ast) _print_AST(ast, 0)
-void _print_AST(volatile ASTNode* ast, unsigned long spacing);
+void print_AST(ASTNode* ast);
 
 AST parser(Token* tokens, Token** infixes, Error* error_buf);
 

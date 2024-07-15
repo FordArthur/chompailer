@@ -1,4 +1,5 @@
 #include "scanner.h"
+#include "vec.h"
 
 #define mktok(_type, _line, _index, _length, _token) ((Token) {.type = _type, .line = _line, .index = _index, .length = _length, .token = _token})
 
@@ -69,28 +70,29 @@ Tokens scanner(char *stream) {
   Token** infixes = new_vector_with_capacity(*infixes, 8); // NOLINT(bugprone-sizeof-expression)
 
   TrieNode* syntax_trie = create_node(0, -1);
-  insert_trie("::", DOUBLE_COLON, syntax_trie);
-  insert_trie("=", EQUALS, syntax_trie);
-  insert_trie("|", BAR, syntax_trie);
-  insert_trie("&", AMPERSAND, syntax_trie);
-  insert_trie("->", ARROW, syntax_trie);
-  insert_trie("=>", DOUBLE_ARROW, syntax_trie);
-  insert_trie("||", DOUBLE_BAR, syntax_trie);
-  insert_trie("&&", DOUBLE_AMPERSAND, syntax_trie);
-  insert_trie(":=", CONSTANT_DEFINE, syntax_trie);
-  insert_trie("if", IF, syntax_trie);
-  insert_trie("then", THEN, syntax_trie);
-  insert_trie("else", ELSE, syntax_trie);
-  insert_trie("let", LET, syntax_trie);
+  insert_trie("="       , EQUALS            , syntax_trie);
+  insert_trie("|"       , BAR               , syntax_trie);
+  insert_trie("&"       , AMPERSAND         , syntax_trie);
+  insert_trie("::"      , DOUBLE_COLON      , syntax_trie);
+  insert_trie("->"      , ARROW             , syntax_trie);
+  insert_trie("=>"      , DOUBLE_ARROW      , syntax_trie);
+  insert_trie("||"      , DOUBLE_BAR        , syntax_trie);
+  insert_trie("&&"      , DOUBLE_AMPERSAND  , syntax_trie);
+  insert_trie(":="      , CONSTANT_DEFINE   , syntax_trie);
+  insert_trie("if"      , IF                , syntax_trie);
+  insert_trie("let"     , LET               , syntax_trie);
+  insert_trie("then"    , THEN              , syntax_trie);
+  insert_trie("else"    , ELSE              , syntax_trie);
+  insert_trie("data"    , DATA              , syntax_trie);
+  insert_trie("class"   , CLASS             , syntax_trie);
+  insert_trie("instance", INSTANCE          , syntax_trie);
+
 #ifdef DEBUG
   printf("Syntax trie:\n");
   print_trie(syntax_trie);
 #endif
 
   for (char curchar; (curchar = consume(&stream));) {
-#ifdef DEBUG
-    printf("%s", stream);
-#endif
     switch (curchar) {
       case ' ':
       case '\n':
@@ -265,8 +267,7 @@ Tokens scanner(char *stream) {
 
         break;
       }
-      default: 
-      scan_symbol: {
+      default: scan_symbol: {
         char* start_token = stream - 1;
         unsigned long index = _INDEX - 1;
         unsigned long size;
@@ -279,38 +280,31 @@ Tokens scanner(char *stream) {
         }
 
         start_token = reserve_token(size = stream - start_token, start_token);
+        TokenType toktype;
 
-          vect_h* header = _get_header(token_stream);
-          token_stream[header->size] = mktok(isupper(*start_token)? TYPE_K : follow_pattern_with_default(start_token, syntax_trie, is_alnum? IDENTIFIER : OPERATOR), _LINE, index, size, start_token);
-          header->size++;
-          if (header->size == header->capacity) {
-            header->capacity += CAPACITY;
-            header = realloc(header, sizeof(vect_h) + header->capacity * header->obj_size);
-            token_stream = (void*) (header + 1);
-          }
-        // push(
-        //   token_stream, 
-        //   mktok(isupper(*start_token)? TYPE_K : follow_pattern_with_default(start_token, syntax_trie, is_alnum? IDENTIFIER : OPERATOR), _LINE, index, size, start_token)
-        // //      ^-------------------------------------------------------------- type should be stored somewhere so it
-        // //                                                                      can be added to the infixes if appropiate
-        // );
+        push(
+          token_stream, 
+          mktok(toktype = isupper(*start_token)? TYPE_K : follow_pattern_with_default(start_token, syntax_trie, is_alnum? IDENTIFIER : OPERATOR), _LINE, index, size, start_token)
+        );
+
+        if (toktype == INFIXL || toktype == INFIXR)
+          push(infixes, &vector_last(token_stream));
 
         break;
       }
     }
   }
 
-  push(
-    token_stream,
-    mktok(_EOF, _LINE, _INDEX, 1, NULL);
-  );
   push(_LINES, stream);
   return (Tokens) {
     .is_correct_stream = is_correct_stream,
     .lines = _LINES,
     .scanned.token_stream = token_stream,
-    .scanned.infixes = NULL,
+    .scanned.infixes = infixes,
     .error_buf = error_buffer
   };
 }
 
+/** TODO:
+ * - make it add infixes to the infixes vector
+ */
