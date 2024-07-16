@@ -40,6 +40,8 @@ typedef enum TokenType {
   INFIXR,
 
   COMMENT,
+
+  EndOfFile // Necessary because parser needs a final delimiting token (enables multithreading too in a future)
 } TokenType;
 
 typedef struct Token {

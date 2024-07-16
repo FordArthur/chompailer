@@ -1,5 +1,5 @@
 CC = gcc
-CCFLAGS = -march=native -mavx2 -O2
+CCFLAGS = -Wall -march=native -mavx2 -O2
 EXEC_FILE = chompailer
 SRC = $(wildcard *.c)
 OBJ = $(SRC:.c=.o)

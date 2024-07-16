@@ -85,6 +85,8 @@ Tokens scanner(char *stream) {
   insert_trie("else"    , ELSE              , syntax_trie);
   insert_trie("data"    , DATA              , syntax_trie);
   insert_trie("class"   , CLASS             , syntax_trie);
+  insert_trie("infixl"  , INFIXL            , syntax_trie);
+  insert_trie("infixr"  , INFIXR            , syntax_trie);
   insert_trie("instance", INSTANCE          , syntax_trie);
 
 #ifdef DEBUG
@@ -296,6 +298,7 @@ Tokens scanner(char *stream) {
   }
 
   push(_LINES, stream);
+  push(token_stream, mktok(EndOfFile, 0, 0, 0, 0));
   return (Tokens) {
     .is_correct_stream = is_correct_stream,
     .lines = _LINES,

@@ -1,6 +1,7 @@
 #include "parser.h"
 #include "compiler_inner_types.h"
 #include "scanner.h"
+#include "trie.h"
 #include "vec.h"
 #include <stdio.h>
 
@@ -17,10 +18,36 @@ typedef struct PrecInfo {
 
 typedef unsigned char ExpStackIndex;
 
+static inline bool in_delims(TokenType type, TokenType* dels, unsigned long dels_s);
+
+static TokenType
+comas[] = {
+  COMA
+}, close_constaint[] = {
+  CLOSE_PAREN,
+  DOUBLE_ARROW
+}, equals[] = {
+  EQUALS
+}, bars[] = {
+  BAR
+}, semicolon[] = {
+  SEMI_COLON
+}, arrow_to_type[] = {
+  ARROW,
+  TYPE_K
+}, value_expression[] = {
+  TYPE_K, IDENTIFIER, NATURAL, REAL, CHARACTER, STRING, 
+}, identifier[] = {
+  IDENTIFIER
+};
+
 bool_lambda(identifiers, (t == IDENTIFIER));
 bool_lambda(not_identifiers, (t != IDENTIFIER));
 bool_lambda(iden_and_types, (t == TYPE_K || t == IDENTIFIER));
-bool_lambda(not_iden_and_types, (t != TYPE_K && t != IDENTIFIER))
+bool_lambda(not_iden_and_types, (t != TYPE_K && t != IDENTIFIER));
+bool_lambda(value, (in_delims(t, value_expression, elemsof(value_expression))))
+bool_lambda(non_value, (!in_delims(t, value_expression, elemsof(value_expression))))
+
 
 #ifdef DEBUG
 #pragma GCC push_options
@@ -52,7 +79,12 @@ void print_AST(ASTNode* ast) {
       printf("%s", ast->term.name);
       break;
     case EXPRESSION:
-      printf("EXPRESSION");
+      printf("(");
+      for_each(i, ast->expression_v) {
+        print_AST(ast->expression_v + i);
+        printf(" ");
+      }
+      printf("\b)");
       break;
     case BIN_EXPRESSION:
       printf("%s (", ast->bin_expression.op->term.name);
@@ -62,15 +94,21 @@ void print_AST(ASTNode* ast) {
       printf(")");
       break;
     case DECLARATION:
-      for_each(i, ast->declaration.expression_v) {
+      if (ast->declaration.expression_v) for_each(i, ast->declaration.expression_v) {
         print_AST(ast->declaration.expression_v + i);
         printf(" ");
       }
       printf(":: ");
-      for_each(i, ast->declaration.expression_v) {
-        print_AST(ast->declaration.type_v + i);
-        printf(" ");
+      // This is a for_each, i have 0 clue why it thinks there are 102 elements if i dont 
+      // do it this way
+      for (unsigned long i = 0; i < _get_header(ast->declaration.type_v_v)->size; i++) { 
+        for (unsigned long j = 0; j < _get_header(ast->declaration.type_v_v)->size; j++) {
+          print_AST(ast->declaration.type_v_v[i] + j);
+          printf(" ");
+        }
+        printf("\b, ");
       }
+      printf("\b\b  ");
       break;
     case V_DEFINITION:
     case IMPLEMENTATION:
@@ -79,11 +117,15 @@ void print_AST(ASTNode* ast) {
         printf(" ");
       }
       printf("= ");
-      if (ast->type == IMPLEMENTATION) for_each(i, ast->implementation.body_v) {
-        print_AST(ast->implementation.body_v + i);
-        printf(" ");
+      if (ast->type == IMPLEMENTATION) { 
+        for_each(i, ast->implementation.body_v) {
+          print_AST(ast->implementation.body_v[i]);
+          printf(", ");
+        } 
+        printf("\b\b");
       } else 
         print_AST(ast->variable_definition.expression);
+      printf("; ");
       break;
     case F_DEFINITION:
       print_AST(ast->function_definition.declaration);
@@ -136,10 +178,10 @@ static inline unsigned long mkPrecInfo(unsigned int precedence, bool is_infixr) 
   return *(unsigned long*) &precinfo;
 }
 
-static inline PrecInfo get_precedence(char* name, TrieNode* ctx_trie) {
+static inline PrecInfo get_precedence(char* name, TrieNode* precedence_trie) {
   // TODO: Emit warning when not in trie
   PrecInfo _default = (PrecInfo) { .prec = 6, .is_infixr = false };
-  unsigned long res = follow_pattern_with_default(name, ctx_trie, *(unsigned long*) &_default);
+  unsigned long res = follow_pattern_with_default(name, precedence_trie, *(unsigned long*) &_default);
   return *(PrecInfo*) &res;
 }
 
@@ -216,9 +258,11 @@ parse_rest: {}
   if (test_error(parser_res))
     return parser_res;
   if ((*tokens_ptr)->type == OPEN_PAREN) {
+    (*tokens_ptr)++;
     ASTNode* nested_expr = Malloc(sizeof(*nested_expr));
     nested_expr->type = EXPRESSION;
-    nested_expr->expression_v = (*call_parser)(tokens_ptr, expr);
+    nested_expr->expression_v = new_vector_with_capacity(*nested_expr->expression_v, 4); // maybe change this to be more flexible but idc for now
+    (*call_parser)(tokens_ptr, nested_expr->expression_v);
     if ((*tokens_ptr)->type != CLOSE_PAREN)
       return encode_error(*tokens_ptr);
     (*tokens_ptr)++;
@@ -249,50 +293,69 @@ static inline ASTNode* parse_typish(Token** tokens_ptr, ASTNode* constraint) {
 }
 
 // Returns encoded pointers
-static inline ASTNode* parse_data_decl(Token** tokens_ptr, ASTNode* data_decl) {
+static inline ASTNode* parse_type_expression(Token** tokens_ptr, ASTNode* data_decl) {
   if ((*tokens_ptr)->type != TYPE_K)
     return encode_error(*tokens_ptr);
   push(data_decl, token_to_term(TYPE_CONSTRUCTOR, (**tokens_ptr)));
   (*tokens_ptr)++;
-  return parse_composite_group(tokens_ptr, &parse_many_iden_and_types, &parse_data_decl, data_decl, TYPE);
+  return parse_composite_group(tokens_ptr, &parse_many_iden_and_types, &parse_type_expression, data_decl, TYPE);
+}
+
+static inline ASTNode* parse_value_group(Token** tokens_ptr, ASTNode* expr) {
+  return parse_group(tokens_ptr, non_value, value, expr, TYPE_CONSTRUCTOR);
+}
+
+static inline ASTNode* parse_value_expression(Token** tokens_ptr, ASTNode* expr) {
+  return parse_composite_group(tokens_ptr, parse_value_group, parse_value_expression, expr, TYPE_CONSTRUCTOR);
 }
 
 // Returns encoded pointers
-static inline ASTNode* parse_expression(
-  Token* tokens,          TokenType* allowed_terms, unsigned long allowed_terms_s, 
-  TrieNode* ctx_trie,     TokenType* delims,        unsigned long delims_s, 
-  TermType what_is_type,  bool strict_operators
-) {
-  // TODO: Add a strict parameter for binary operation parsing
-  //   (?) Use parse_group
-  ASTNode* expr = new_vector_with_capacity(*expr, 4);
-parse_expr:
-  for (; tokens->type != OPERATOR && in_delims(tokens->type, delims, delims_s); tokens++) {
-    if (!in_delims(tokens->type, allowed_terms, allowed_terms_s)) {
-      return encode_error(tokens);
+static inline ASTNode* parse_expression(Token** tokens_ptr, ASTNode* expr) {
+  ASTNode* root = expr;
+  ASTNode* vdef;
+  bool is_let = false;
+  if ((*tokens_ptr)->type == LET) {
+    is_let = true;
+    vdef = Malloc(sizeof(*vdef));
+    *vdef = (ASTNode) {
+      .type = V_DEFINITION,
+      .variable_definition.arguments_v = new_vector_with_capacity(*vdef->variable_definition.arguments_v, 4),
+      .variable_definition.expression = NULL
+    };
+    char* name = tokens_ptr[1]->token;
+    verify_types(tokens_ptr, identifier, elemsof(identifier));
+    if (!verify_types(tokens_ptr, equals, elemsof(equals))) {
+      parse_composite_group(tokens_ptr, parse_value_expression, parse_value_expression, vdef->variable_definition.arguments_v, TYPE_CONSTRUCTOR);
+      verify_types(tokens_ptr, equals, elemsof(equals));
     }
-    push(expr, token_to_term(tokenT_to_termT(tokens->type, what_is_type), (*tokens)))
   }
-  if (in_delims(tokens->type, delims, delims_s))
-    return expr;
-  PrecInfo curprec = get_precedence(tokens->token, ctx_trie);
+  parse_composite_group(tokens_ptr, &parse_value_expression, &parse_expression, expr, TYPE_CONSTRUCTOR);
+  // TODO: if ... then ... else ...
+  if ((*tokens_ptr)->type != OPERATOR) {
+    if (is_let) {
+      vdef->variable_definition.expression = root;
+      return vdef;
+    }
+    return root;
+  }
+parse_expr: {}
+  PrecInfo curprec = get_precedence((*tokens_ptr)->token, precedence_trie);
 
   ASTNode* new_bin_op = Malloc(sizeof(*new_bin_op));
-  *new_bin_op = token_to_term(FUNCTION, (*tokens));
+  *new_bin_op = token_to_term(FUNCTION, (**tokens_ptr));
 
   ASTNode* new_bin_expr = Malloc(sizeof(*new_bin_expr));
   new_bin_expr->type = BIN_EXPRESSION;
   new_bin_expr->bin_expression.op = new_bin_op;
 
-  ASTNode* root = expr;
   ASTNode* above_node = root;
   ASTNode* prev_above_node;
 
   bool in_root = true;
   while (
     above_node->type == BIN_EXPRESSION 
-    && get_precedence(above_node->bin_expression.op->term.name, ctx_trie).prec 
-    + curprec.is_infixr * (curprec.prec == get_precedence(above_node->bin_expression.op->term.name, ctx_trie).prec) 
+    && get_precedence(above_node->bin_expression.op->term.name, precedence_trie).prec 
+    + curprec.is_infixr * (curprec.prec == get_precedence(above_node->bin_expression.op->term.name, precedence_trie).prec) 
     > curprec.prec
   ) {
     prev_above_node = above_node;
@@ -318,7 +381,6 @@ static inline ASTNode** parse_sep_by(
   unsigned long init_cap
 ) {
   ASTNode** aggregate_vec = new_vector_with_capacity(*aggregate_vec, init_cap); // NOLINT(bugprone-sizeof-expression)
-  ASTNode* group_vec;
   (*tokens_ptr)--;
   do {
     (*tokens_ptr)++;
@@ -330,24 +392,6 @@ static inline ASTNode** parse_sep_by(
   return aggregate_vec;
 }
 
-static TokenType
-data_parse_structure[] = {
-  DATA,
-  TYPE_K,
-  EQUALS
-}, comas[] = {
-  COMA
-}, close_constaint[] = {
-  CLOSE_PAREN,
-  DOUBLE_ARROW
-}, equals[] = {
-  EQUALS
-}, bars[] = {
-  BAR
-}, semicolon[] = {
-  SEMI_COLON
-};
-
 AST parser(Token* tokens, Token** infixes, Error* error_buf) {
   _Static_assert(1 << sizeof(ExpStackIndex) <= MAX_PARENTHESIS  , "ExpStackIndex must be able to entirely index parenthesis stack");
   _Static_assert(sizeof(PrecInfo) <= sizeof(unsigned long)      , "Cannot fit PrecInfo into unsigned long");
@@ -357,14 +401,11 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
   TrieNode* type_trie = create_node(0, -1);
   bool is_correct_ast = true;
 
-
-  PrecInfo curprec;
-
   precedence_trie = create_node(0, -1);
   insert_trie("+", mkPrecInfo(6, false), precedence_trie);
   insert_trie("*", mkPrecInfo(5, false), precedence_trie);
   // ...
-  Token* infix;
+  Token* infix = infixes[0];
   for_each_element(infix, infixes) {
     // blah blah blah errors
     insert_trie(infix[2].token, mkPrecInfo(atoi(infix[1].token), infix[0].type == INFIXR), precedence_trie);
@@ -384,6 +425,7 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
         push(
           error_buf,
           mkerr(PARSER, tokens->line, tokens->index, "Missing semicolon")
+          // Can't make errors for tokens like these, so find a way
         );
       }
       break;
@@ -391,7 +433,38 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
 #ifdef DEBUG
         printf("Identifier\n");
 #endif /* ifdef DEBUG */
-        // if :: parse decl (parse constaint, parse type constructors sepby \, , ->, parse type constructor)
+        char* name = token.token;
+        tokens++;
+        if (tokens->type == DOUBLE_COLON) {
+          tokens++;
+          ASTNode* func_decl = Malloc(sizeof(*func_decl));
+          *func_decl = (ASTNode) {
+            .type = DECLARATION,
+            .declaration.expression_v = NULL,
+            .declaration.type_v_v = parse_sep_by(&tokens, parse_type_expression, comas, elemsof(comas), 4)
+          };
+          ASTNode* ret_type = Malloc(sizeof(*ret_type));
+          *ret_type = token_to_term(TYPE, (tokens[1]));
+          verify_types(&tokens, arrow_to_type, elemsof(arrow_to_type));
+          push(func_decl->declaration.type_v_v, ret_type);
+          insert_trie(name, (unsigned long) func_decl, ASTrie);
+          verify_types(&tokens, semicolon, elemsof(semicolon));
+          break;
+        }
+
+        ASTNode* func_impl = Malloc(sizeof(*func_impl));
+        *func_impl = (ASTNode) {
+          .type = IMPLEMENTATION,
+          .implementation.arguments_v = new_vector_with_capacity(*func_impl->implementation.arguments_v, 4),
+          .implementation.body_v = new_vector_with_capacity(*func_impl->implementation.arguments_v, 4)
+        };
+        // Somewhere over here, if theres an equalsm stop too
+        // Also, code lets into this
+        parse_composite_group(&tokens, parse_value_expression, parse_value_expression, func_impl->implementation.arguments_v, TYPE_CONSTRUCTOR);
+        // if stopped == equals dont push expression and in fact start another one
+        verify_types(&tokens, equals, elemsof(equals));
+        func_impl->implementation.body_v = parse_sep_by(&tokens, parse_expression, comas, elemsof(comas), 4);
+        verify_types(&tokens, semicolon, elemsof(semicolon));
         // parse arguments (parse term groups sepby *\{=, ;}), =, parse binary expressions sepby ;
         break;
       }
@@ -416,7 +489,7 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
         ASTNode* data_declaration = Malloc(sizeof(*data_declaration));
         data_declaration->type = DATA_DECLARATION;
         data_declaration->data_declaration.constraints = data_formal_type;
-        data_declaration->data_declaration.decl_v = parse_sep_by(&tokens, parse_data_decl, bars, elemsof(bars), 4);
+        data_declaration->data_declaration.decl_v = parse_sep_by(&tokens, parse_type_expression, bars, elemsof(bars), 4);
         tokens++;
         verify_types(&tokens, semicolon, elemsof(semicolon));
         insert_trie(name, (unsigned long) data_declaration, ASTrie);
@@ -458,5 +531,7 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
 #endif
 
 /** TODO:
+ * - Have different ties and a function for that checks for redefinitions and inserts in tries
  * - Handle errors in every single instance of functions that return encoded pointers and verify types
+ * - (General): Be able to handle errors of missing pre-defined tokens (Perhaps encode the pointer and if it's kernel-space it's just a char?)
  */

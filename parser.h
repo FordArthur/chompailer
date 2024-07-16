@@ -58,11 +58,11 @@ typedef struct ASTNode {
     } formal_type;
     struct {
       struct ASTNode* expression_v;
-      struct ASTNode* type_v;
+      struct ASTNode** type_v_v;
     } declaration;
     struct {
       struct ASTNode* arguments_v;
-      struct ASTNode* body_v;
+      struct ASTNode** body_v;
     } implementation;
     struct {
       struct ASTNode* declaration;
