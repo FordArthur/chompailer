@@ -36,7 +36,7 @@ static inline char escape_char(char c) {
 static inline bool isoper(char c) {
   unsigned long i = 0;
   const char s[] = "ºª!·$%&/=?¿^+*<>,.:-_|@#~½¬•";
-  #pragma unroll 4
+
   for (; s[i] && s[i] != c; i++);
   return s[i];
 }
@@ -185,7 +185,7 @@ Tokens scanner(char *stream) {
           goto scan_symbol;
         break;
       case '\'':
-        if (stream[1] == '\'' || stream[0] == '\\' && stream[2] == '\'') {
+        if (stream[1] == '\'' || (stream[0] == '\\' && stream[2] == '\'')) {
           char offs, character = (offs = stream[1] == '\'')? stream[0] : escape_char(stream[1]);
 
           push(

@@ -466,6 +466,7 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
         func_impl->implementation.body_v = parse_sep_by(&tokens, parse_expression, comas, elemsof(comas), 4);
         verify_types(&tokens, semicolon, elemsof(semicolon));
         // parse arguments (parse term groups sepby *\{=, ;}), =, parse binary expressions sepby ;
+        insert_trie(name, (unsigned long) func_impl, ASTrie);
         break;
       }
       case DATA: {
@@ -531,6 +532,9 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
 #endif
 
 /** TODO:
+ * - (TO FIX) Parse combinators dont work when they parse more than 2 nodes
+ * - (TO FIX) Operators go into an infinite spiral
+ * - Allow for using operators inside arguments
  * - Have different ties and a function for that checks for redefinitions and inserts in tries
  * - Handle errors in every single instance of functions that return encoded pointers and verify types
  * - (General): Be able to handle errors of missing pre-defined tokens (Perhaps encode the pointer and if it's kernel-space it's just a char?)
