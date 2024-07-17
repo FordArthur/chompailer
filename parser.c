@@ -3,12 +3,14 @@
 #include "scanner.h"
 #include "trie.h"
 #include "vec.h"
+#include <stdbool.h>
 #include <stdio.h>
 
 #define upper_ptr_bits 0xFFFF000000000000
 #define elemsof(xs) (sizeof(xs)/sizeof(xs[0]))
 #define bool_lambda(name, expr) static inline bool name(TokenType t) { return (expr); }
 #define token_to_term(termtype, tok) (ASTNode) {.type = TERM, .term.type = termtype, .term.index = tok.index, .term.line = tok.line, .term.length = tok.length, .term.name = tok.token}
+#define handle(b, err) if (b) { return encode_error(err); }
 
 // !! It's really important that the size of this struct isnt greater than unsigned long !!
 typedef struct PrecInfo {
@@ -329,10 +331,10 @@ static inline ASTNode* parse_expression(Token** tokens_ptr, ASTNode* expr) {
       .type = V_DEFINITION,
       .variable_definition.arguments_v = new_vector_with_capacity(*vdef->variable_definition.arguments_v, 4),
     };
-    verify_types(tokens_ptr, identifier, elemsof(identifier));
+    handle(verify_types(tokens_ptr, identifier, elemsof(identifier)), (*tokens_ptr));
     if (!verify_types(tokens_ptr, equals, elemsof(equals))) {
       parse_value_expression(tokens_ptr, vdef->variable_definition.arguments_v);
-      verify_types(tokens_ptr, equals, elemsof(equals));
+      handle(verify_types(tokens_ptr, equals, elemsof(equals)), (*tokens_ptr));
     }
   }
 parse_expr:
@@ -454,10 +456,23 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
           };
           ASTNode* ret_type = Malloc(sizeof(*ret_type));
           *ret_type = token_to_term(TYPE, (tokens[1]));
-          verify_types(&tokens, arrow_to_type, elemsof(arrow_to_type));
+          if (!verify_types(&tokens, arrow_to_type, elemsof(arrow_to_type))) {
+            is_correct_ast = false;
+            push(error_buf, mkerr(PARSER, tokens->line, tokens->index, "Unexpected token"));
+          }
           push(func_decl->declaration.type_v_v, ret_type);
           insert_trie(name, (unsigned long) func_decl, ASTrie);
-          verify_types(&tokens, semicolon, elemsof(semicolon));
+          if (!verify_types(&tokens, semicolon, elemsof(semicolon))) {
+            is_correct_ast = false;
+            push(error_buf, mkerr(PARSER, tokens->line, tokens->index, "Missing semicolon"))
+          }
+          ASTNode* def;
+          if ((def = (ASTNode*)follow_pattern_with_default(name, ASTrie, 0))) {
+            is_correct_ast = false;
+            push(error_buf, mkerr(PARSER, tokens->line, tokens->index, "Cannot redefine type"))
+          } else {
+            def->function_definition.declaration = func_decl;
+          }
           break;
         }
 
@@ -467,10 +482,27 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
           .implementation.arguments_v = new_vector_with_capacity(*func_impl->implementation.arguments_v, 4),
         };
         parse_value_expression(&tokens, func_impl->implementation.arguments_v);
-        verify_types(&tokens, equals, elemsof(equals));
+        if (!verify_types(&tokens, equals, elemsof(equals))) {
+          is_correct_ast = false;
+          push(error_buf, mkerr(PARSER, tokens->line, tokens->index, "Expected equals"))
+        }
         func_impl->implementation.body_v = parse_sep_by(&tokens, parse_expression, comas, elemsof(comas), 4);
-        verify_types(&tokens, semicolon, elemsof(semicolon));
-        insert_trie(name, (unsigned long) func_impl, ASTrie);
+        if (!verify_types(&tokens, semicolon, elemsof(semicolon))) {
+          is_correct_ast = false;
+          push(error_buf, mkerr(PARSER, tokens->line, tokens->index, "Missing semicolon"))
+        }
+        ASTNode* def;
+        if ((def = (ASTNode*)follow_pattern_with_default(name, ASTrie, 0))) {
+          push(def->function_definition.implementations_v, *func_impl);
+        } else {
+          def = Malloc(sizeof(*def));
+          *def = (ASTNode) {
+            .type = F_DEFINITION,
+            .function_definition.implementations_v = new_vector_with_capacity(*def->function_definition.implementations_v, 4)
+          };
+          push(def->function_definition.implementations_v, *func_impl);
+          insert_trie(name, (unsigned long) def, ASTrie);
+        }
         break;
       }
       case DATA: {
@@ -484,20 +516,34 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
         if (tokens->type == OPEN_PAREN) {
           tokens++;
           data_formal_type->formal_type.constraints_v_v = parse_sep_by(&tokens, &parse_typish, comas, elemsof(comas), 4);
-          //tokens--;
-          verify_types(&tokens, close_constaint, elemsof(close_constaint));
+          if (!verify_types(&tokens, close_constaint, elemsof(close_constaint))) {
+            is_correct_ast = false;
+            push(error_buf, mkerr(PARSER, tokens->line, tokens->index, "Unexpected token"));
+          }
         }
         char* name = tokens->token;
         data_formal_type->formal_type.type_v = new_vector_with_capacity(*data_formal_type->formal_type.type_v, 4);
         parse_typish(&tokens, data_formal_type->formal_type.type_v);
-        verify_types(&tokens, equals, elemsof(equals));
+        if (!verify_types(&tokens, equals, elemsof(equals))) {
+          is_correct_ast = false;
+          push(error_buf, mkerr(PARSER, tokens->line, tokens->index, "Expected equals"));
+        }
         ASTNode* data_declaration = Malloc(sizeof(*data_declaration));
         data_declaration->type = DATA_DECLARATION;
         data_declaration->data_declaration.constraints = data_formal_type;
         data_declaration->data_declaration.decl_v = parse_sep_by(&tokens, parse_type_expression, bars, elemsof(bars), 4);
         tokens++;
-        verify_types(&tokens, semicolon, elemsof(semicolon));
-        insert_trie(name, (unsigned long) data_declaration, ASTrie);
+        if (!verify_types(&tokens, semicolon, elemsof(semicolon))) {
+          is_correct_ast = false;
+          push(error_buf, mkerr(PARSER, tokens->line, tokens->index, "Missing semicolon"));
+        }
+        ASTNode* def;
+        if ((def = (ASTNode*)follow_pattern_with_default(name, ASTrie, 0))) {
+          is_correct_ast = false;
+          push(error_buf, mkerr(PARSER, tokens->line, tokens->index, "Cannot redefine data declaration"));
+          break;
+        } 
+        insert_trie(name, (unsigned long) data_declaration, type_trie);
         break;
       }
       case INSTANCE:
@@ -537,8 +583,7 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
 #endif
 
 /** TODO:
- * - (IMPLEMNTED, NOT IN USE) Have different tries and a function for that checks for redefinitions and inserts in tries
- * - If then else, vector/tuple literals
  * - Handle errors in every single instance of functions that return encoded pointers and verify types
+ * - If then else, vector/tuple literals
  * - (General): Be able to handle errors of missing pre-defined tokens (Perhaps encode the pointer and if it's kernel-space it's just a char?)
  */

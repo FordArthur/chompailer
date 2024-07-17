@@ -29,18 +29,15 @@ TrieNode* create_node(char key, unsigned long value) {
   return new_node;
 }
 
-// Returns false if it didn't insert the pattern (already there / not enough memory)
+// Returns false if it didn't insert the pattern (not enough memory)
 bool insert_trie(char* pattern, unsigned long final_value, TrieNode* trie) {
   TrieNode* node = trie;
   char* subpattern = pattern;
-  bool is_new = false;
   for (; *subpattern; subpattern++) {
     if (TRIE_ASCII_OFFSET > *subpattern || *subpattern > TRIE_ASCII_OFFSET + TRIE_LOOK_UP_SIZE)
       return false;
-    if (!node->children[*subpattern - TRIE_ASCII_OFFSET]) {
-      is_new = true;
+    if (!node->children[*subpattern - TRIE_ASCII_OFFSET])
       node->children[*subpattern - TRIE_ASCII_OFFSET] = create_node(*subpattern, subpattern[1]? -1 : final_value);
-    }
     node = node->children[*subpattern - TRIE_ASCII_OFFSET];
   }
   return true;
