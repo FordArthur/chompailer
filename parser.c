@@ -36,9 +36,11 @@ comas[] = {
   ARROW,
   TYPE_K
 }, value_expression[] = {
-  TYPE_K, IDENTIFIER, NATURAL, REAL, CHARACTER, STRING, 
+  TYPE_K, IDENTIFIER, NATURAL, REAL, CHARACTER, STRING, OPERATOR
 }, identifier[] = {
   IDENTIFIER
+}, let[] = {
+  LET
 };
 
 bool_lambda(identifiers, (t == IDENTIFIER));
@@ -119,12 +121,19 @@ void print_AST(ASTNode* ast) {
       printf("= ");
       if (ast->type == IMPLEMENTATION) { 
         for_each(i, ast->implementation.body_v) {
-          print_AST(ast->implementation.body_v[i]);
+          if (ast->implementation.body_v[i]->type == BIN_EXPRESSION || ast->implementation.body_v[i]->type == V_DEFINITION)
+            print_AST(ast->implementation.body_v[i]);
+          else for_each(j, ast->implementation.body_v[i]) {
+            print_AST(ast->implementation.body_v[i] + j);
+            printf(" ");
+          }
           printf(", ");
         } 
         printf("\b\b");
-      } else 
+      } else if (ast->variable_definition.expression->type == BIN_EXPRESSION)
         print_AST(ast->variable_definition.expression);
+      else for_each(i, ast->variable_definition.expression)
+        print_AST(ast->variable_definition.expression + i);
       printf("; ");
       break;
     case F_DEFINITION:
@@ -189,8 +198,8 @@ static inline bool verify_types(Token** stream, TokenType* types, unsigned long 
   bool is_correct_type = true;
   for (unsigned long i = 0; i < types_l; i++) {
     is_correct_type &= (*stream)[i].type == types[i];
+    if (is_correct_type) (*stream)++;
   }
-  *stream += types_l;
   return is_correct_type;
 }
 
@@ -205,7 +214,6 @@ static inline TermType tokenT_to_termT(TokenType ttype,  TermType what_is_type) 
     default:          return -1;
   }
 }
-
 static inline bool in_delims(TokenType type, TokenType* dels, unsigned long dels_s) {
   bool is_in_delims = false;
   for (unsigned long i = 0; i < dels_s; i++)
@@ -314,22 +322,22 @@ static inline ASTNode* parse_expression(Token** tokens_ptr, ASTNode* expr) {
   ASTNode* root = expr;
   ASTNode* vdef;
   bool is_let = false;
-  if ((*tokens_ptr)->type == LET) {
+  if (verify_types(tokens_ptr, let, elemsof(let))) {
     is_let = true;
     vdef = Malloc(sizeof(*vdef));
     *vdef = (ASTNode) {
       .type = V_DEFINITION,
       .variable_definition.arguments_v = new_vector_with_capacity(*vdef->variable_definition.arguments_v, 4),
-      .variable_definition.expression = NULL
     };
-    char* name = tokens_ptr[1]->token;
     verify_types(tokens_ptr, identifier, elemsof(identifier));
     if (!verify_types(tokens_ptr, equals, elemsof(equals))) {
-      parse_composite_group(tokens_ptr, parse_value_expression, parse_value_expression, vdef->variable_definition.arguments_v, TYPE_CONSTRUCTOR);
+      parse_value_expression(tokens_ptr, vdef->variable_definition.arguments_v);
       verify_types(tokens_ptr, equals, elemsof(equals));
     }
   }
-  parse_composite_group(tokens_ptr, &parse_value_expression, &parse_expression, expr, TYPE_CONSTRUCTOR);
+parse_expr:
+
+  parse_value_expression(tokens_ptr, expr);
   // TODO: if ... then ... else ...
   if ((*tokens_ptr)->type != OPERATOR) {
     if (is_let) {
@@ -338,7 +346,6 @@ static inline ASTNode* parse_expression(Token** tokens_ptr, ASTNode* expr) {
     }
     return root;
   }
-parse_expr: {}
   PrecInfo curprec = get_precedence((*tokens_ptr)->token, precedence_trie);
 
   ASTNode* new_bin_op = Malloc(sizeof(*new_bin_op));
@@ -372,6 +379,7 @@ parse_expr: {}
   else 
     prev_above_node->bin_expression.right_expression_v = new_bin_expr;
 
+  (*tokens_ptr)++;
   goto parse_expr;
 }
 
@@ -385,7 +393,7 @@ static inline ASTNode** parse_sep_by(
   do {
     (*tokens_ptr)++;
     ASTNode* group_vec = new_vector_with_capacity(*group_vec, init_cap);
-    if (test_error((*parse_func)(tokens_ptr, group_vec)))
+    if (test_error(group_vec = (*parse_func)(tokens_ptr, group_vec)))
       return encode_error(*tokens_ptr);
     push(aggregate_vec, group_vec);
   } while (in_delims((*tokens_ptr)->type, delims, delims_s));
@@ -429,6 +437,7 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
         );
       }
       break;
+      case OPERATOR:
       case IDENTIFIER: {
 #ifdef DEBUG
         printf("Identifier\n");
@@ -456,16 +465,11 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
         *func_impl = (ASTNode) {
           .type = IMPLEMENTATION,
           .implementation.arguments_v = new_vector_with_capacity(*func_impl->implementation.arguments_v, 4),
-          .implementation.body_v = new_vector_with_capacity(*func_impl->implementation.arguments_v, 4)
         };
-        // Somewhere over here, if theres an equalsm stop too
-        // Also, code lets into this
-        parse_composite_group(&tokens, parse_value_expression, parse_value_expression, func_impl->implementation.arguments_v, TYPE_CONSTRUCTOR);
-        // if stopped == equals dont push expression and in fact start another one
+        parse_value_expression(&tokens, func_impl->implementation.arguments_v);
         verify_types(&tokens, equals, elemsof(equals));
         func_impl->implementation.body_v = parse_sep_by(&tokens, parse_expression, comas, elemsof(comas), 4);
         verify_types(&tokens, semicolon, elemsof(semicolon));
-        // parse arguments (parse term groups sepby *\{=, ;}), =, parse binary expressions sepby ;
         insert_trie(name, (unsigned long) func_impl, ASTrie);
         break;
       }
@@ -524,6 +528,7 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
   return (AST) {
     .is_correct_ast = is_correct_ast,
     .astrie = ASTrie,
+    .type_trie = type_trie,
     .error_buf = error_buf
   };
 }
@@ -532,10 +537,8 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
 #endif
 
 /** TODO:
- * - (TO FIX) Parse combinators dont work when they parse more than 2 nodes
- * - (TO FIX) Operators go into an infinite spiral
- * - Allow for using operators inside arguments
- * - Have different ties and a function for that checks for redefinitions and inserts in tries
+ * - (IMPLEMNTED, NOT IN USE) Have different tries and a function for that checks for redefinitions and inserts in tries
+ * - If then else, vector/tuple literals
  * - Handle errors in every single instance of functions that return encoded pointers and verify types
  * - (General): Be able to handle errors of missing pre-defined tokens (Perhaps encode the pointer and if it's kernel-space it's just a char?)
  */
