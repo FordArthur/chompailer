@@ -14,7 +14,7 @@ void _print_trie(TrieNode* trie, unsigned long spacing) {
 void for_each_in_trie(TrieNode* trie, void (*func)(unsigned long value)) {
   if (!trie)
     return;
-  if (trie->value != (unsigned long) -1)
+  if (trie->is_terminal)
     (*func)(trie->value);
   for (unsigned long i = 0; i < TRIE_LOOK_UP_SIZE; i++)
     for_each_in_trie(trie->children[i], func);
@@ -38,6 +38,8 @@ bool insert_trie(char* pattern, unsigned long final_value, TrieNode* trie) {
       return false;
     if (!node->children[*subpattern - TRIE_ASCII_OFFSET])
       node->children[*subpattern - TRIE_ASCII_OFFSET] = create_node(*subpattern, subpattern[1]? -1 : final_value);
+    if (!subpattern[1])
+      node->is_terminal = true;
     node = node->children[*subpattern - TRIE_ASCII_OFFSET];
   }
   return true;
@@ -52,5 +54,5 @@ unsigned long follow_pattern_with_default(char* pattern, TrieNode* trie, unsigne
       return _default;
     node = node->children[*subpattern - TRIE_ASCII_OFFSET];
   }
-  return node->value == -1? _default : node->value;
+  return node->is_terminal? node->value : _default;
 }

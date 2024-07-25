@@ -12,6 +12,7 @@
 
 typedef struct TrieNode {
   char key;
+  bool is_terminal;
   unsigned long value;
   struct TrieNode* children[TRIE_LOOK_UP_SIZE];
 } TrieNode;

@@ -32,5 +32,6 @@ vect_h* _get_header(void* vect);
 #define for_each_element(x, v) for (unsigned long m = (unsigned long) v + _get_header(v)->obj_size*_get_header(v)->size; (unsigned long) v < m; v++, x = *v)
 #define vector_last(v) (v[_get_header(v)->size - 1])
 #define is_empty(v) (!_get_header(v)->size)
+#define vector_empty_it(v) (_get_header(v)->size = 0)
 
 #endif // !INSITUCS_VECTOR_HEADER

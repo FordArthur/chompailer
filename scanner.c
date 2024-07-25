@@ -298,7 +298,7 @@ Tokens scanner(char *stream) {
   }
 
   push(_LINES, stream);
-  push(token_stream, mktok(EndOfFile, 0, 0, 0, 0));
+  push(token_stream, mktok(EndOfFile, _LINE, _INDEX, 0, NULL));
   return (Tokens) {
     .is_correct_stream = is_correct_stream,
     .lines = _LINES,

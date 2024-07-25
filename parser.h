@@ -30,7 +30,7 @@ typedef enum ASTType {
   IMPLEMENTATION,
   V_DEFINITION,
   F_DEFINITION,
-  DATA_DECLARATION,
+  CONSTRUCTOR_DEFINITION,
   INSTANCE_DEFINITION,
   CLASS_DECLARATION,
 } ASTType;
@@ -54,11 +54,11 @@ typedef struct ASTNode {
     } bin_expression;
     struct {
       struct ASTNode** constraints_v_v;
-      struct ASTNode* type_v;
+      struct ASTNode** type_v_v;
     } formal_type;
     struct {
       struct ASTNode* expression_v;
-      struct ASTNode** type_v_v;
+      struct ASTNode* formal_type;
     } declaration;
     struct {
       struct ASTNode* arguments_v;
@@ -73,9 +73,9 @@ typedef struct ASTNode {
       struct ASTNode* expression;
     } variable_definition;
     struct {
-      struct ASTNode* constraints;
-      struct ASTNode** decl_v;
-    } data_declaration;
+      struct ASTNode** constraints_v_v;
+      struct ASTNode* constructor_type;
+    } constructor_definition;
     struct {
       struct ASTNode* instance_type;
       struct ASTNode* implementations_v;
