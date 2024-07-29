@@ -16,5 +16,6 @@ debug: $(OBJ)
 $(EXEC_FILE): $(OBJ)
 	$(CC) $^ -o $@
 
+.PHONY: clean
 clean:
 	rm -f $(OBJ)

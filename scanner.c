@@ -8,10 +8,14 @@ static unsigned long _LINE = 1;
 
 static char** _LINES;
 
+#ifdef DEBUG
+#pragma GCC push_options
+#pragma GCC optimize ("O0")
+#endif
+
 void print_token(Token* tok) {
   printf("\t|\n    %lu\t| %s (%d)\n\t| ^\n\t  %lu - %lu\n\n", tok->line, tok->token, tok->type, tok->index, tok->length);
 }
-
 // Size must not take into account null delimiter
 static inline char* reserve_token(const unsigned long size, const char* stream) {
   char* tok = Malloc((size + 1)*sizeof(char));
@@ -282,11 +286,11 @@ Tokens scanner(char *stream) {
         }
 
         start_token = reserve_token(size = stream - start_token, start_token);
-        TokenType toktype;
+        TokenType toktype = isupper(*start_token)? TYPE_K : follow_pattern_with_default(start_token, syntax_trie, is_alnum? IDENTIFIER : OPERATOR);
 
         push(
           token_stream, 
-          mktok(toktype = isupper(*start_token)? TYPE_K : follow_pattern_with_default(start_token, syntax_trie, is_alnum? IDENTIFIER : OPERATOR), _LINE, index, size, start_token)
+          mktok(toktype, _LINE, index, size, start_token)
         );
 
         if (toktype == INFIXL || toktype == INFIXR)
@@ -307,6 +311,10 @@ Tokens scanner(char *stream) {
     .error_buf = error_buffer
   };
 }
+
+#ifdef DEBUG
+#pragma GCC pop_options
+#endif
 
 /** TODO:
  * - make it add infixes to the infixes vector

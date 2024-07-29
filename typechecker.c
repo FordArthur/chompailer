@@ -19,13 +19,6 @@ typedef struct ScopeEntry {
 
 static ScopeEntry* scope_stack;
 
-static char* table[] = {
-  "a", "b", "c", "d", "e", "f",
-  "g", "h", "i", "j", "k", "l",
-  "m", "n", "o", "p", "q", "r",
-  "s", "t", "u", "v", "w", "y",
-  "z"
-}; // This will become into a vector, but idc for now
 
 static inline void reuse_push(Type** cache, bool is_vec_push, Type type) {
   vect_h* cache_header = _get_header(cache);
@@ -33,7 +26,7 @@ static inline void reuse_push(Type** cache, bool is_vec_push, Type type) {
     cache_header = realloc(cache_header, sizeof(vect_h) + sizeof(Type*)*(cache_header->capacity += 4));
   }
   push(cache[is_vec_push? cache_header->size : cache_header->size - 1], type);
-  if (is_vec_push) cache_header++;
+  if (is_vec_push) cache_header->size++;
 }
 
 static inline Type astype_to_type(ASTNode type, signed short* ctx, char* string_rep) {
@@ -63,8 +56,8 @@ static void type_of_types(ASTNode** expr, signed short* ctx, Type** cache) {
 
 static void type_of_implementation(ASTNode* args, ASTNode** body_v, signed short* ctx, Type** cache) {
   TypeVar t;
-  for (unsigned long i = 0; i <= _get_header(args)->size; i++, ({}) {
-    t = (TypeVar) { .info = (*ctx)++, .ast_ptr = (unsigned long) table[i] & 0x0000ffffffffffff };
+  for (unsigned long i = 0; i <= _get_header(args)->size; i++, (push(scope_stack, ((ScopeEntry) { .name = args->term.name, .type = *(Type*) &t } ) ))) {
+    t = (TypeVar) { .info = (*ctx)++, .ast_ptr = 0 };
     reuse_push(cache, true, *(Type*) &t);
   }
   vector_empty_it(scope_stack);
@@ -126,6 +119,7 @@ bool checker(TrieNode* astrie, TrieNode* _type_trie, TrieNode* _instance_trie, E
   for_each_in_trie(astrie, check);
   return passes_type_check;
 }
+
 
 /** IDEAS:
  * - DONE: instead of bitfield, have signed short (the signed bit is turned on iff its a type var, and when it is it's leaving us exactly with 2^15 range, easy to test and to use)

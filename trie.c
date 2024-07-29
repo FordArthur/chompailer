@@ -1,5 +1,4 @@
 #include "trie.h"
-#include <stdbool.h>
 
 void _print_trie(TrieNode* trie, unsigned long spacing) {
   if (!trie)
@@ -24,6 +23,7 @@ TrieNode* create_node(char key, unsigned long value) {
   TrieNode* new_node = malloc(sizeof(*new_node));
   new_node->key = key;
   new_node->value = value;
+  new_node->is_terminal = false;
   for (unsigned long i = 0; i < TRIE_LOOK_UP_SIZE; i++)
     new_node->children[i] = 0;
   return new_node;
@@ -37,10 +37,12 @@ bool insert_trie(char* pattern, unsigned long final_value, TrieNode* trie) {
     if (TRIE_ASCII_OFFSET > *subpattern || *subpattern > TRIE_ASCII_OFFSET + TRIE_LOOK_UP_SIZE)
       return false;
     if (!node->children[*subpattern - TRIE_ASCII_OFFSET])
-      node->children[*subpattern - TRIE_ASCII_OFFSET] = create_node(*subpattern, subpattern[1]? -1 : final_value);
-    if (!subpattern[1])
-      node->is_terminal = true;
+      node->children[*subpattern - TRIE_ASCII_OFFSET] = create_node(*subpattern, -1);
     node = node->children[*subpattern - TRIE_ASCII_OFFSET];
+    if (!subpattern[1]) {
+      node->is_terminal = true;
+      node->value = final_value;
+    }
   }
   return true;
 }
