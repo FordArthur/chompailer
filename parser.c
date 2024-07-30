@@ -1,4 +1,6 @@
 #include "parser.h"
+#include "vec.h"
+#include <stdio.h>
 
 #define elemsof(xs) \
   (sizeof(xs)/sizeof(xs[0]))
@@ -128,16 +130,14 @@ void print_AST(ASTNode* ast) {
       break;
     case FORMAL_TYPE:
       printf("(");
-      bool has_constraints = false;
       if (ast->formal_type.constraints_v_v) for_each(i, ast->formal_type.constraints_v_v) {
-        for_each(j, ast->formal_type.constraints_v_v[i]) {
-          print_AST(ast->formal_type.constraints_v_v[i] + j);
-          printf(" ");
+        printf("%s is ", ast->formal_type.constraints_v_v[i][0].term.name);
+        for_each(j, ast->formal_type.constraints_v_v[i][1].expression_v) {
+          printf("%s, ", ast->formal_type.constraints_v_v[i][1].expression_v[j].term.name);
         }
-        printf("\b, ");
-        has_constraints = true;
+        printf("\b\b");
       }
-      printf(has_constraints? "\b\b) => " : ") => ");
+      printf(") => ");
       for (unsigned long i = 0; i < _get_header(ast->formal_type.type_v_v)->size; i++) {
         for (unsigned long j = 0; j < _get_header(ast->formal_type.type_v_v[i])->size; j++) {
           print_AST(ast->formal_type.type_v_v[i] + j);
@@ -372,11 +372,39 @@ static inline ASTNode** parse_sep_by(
   return aggregate_vec;
 }
 
-static inline ASTNode* parse_constraint(Token** tokens_ptr, ASTNode* constraint) {
-  verify_types(tokens_ptr, constraint_types, elemsof(constraint_types));
-  push(constraint, token_to_term(TYPE_CONSTRUCTOR, (*tokens_ptr)[-2]));
-  push(constraint, token_to_term(TYPE_CONSTRUCTOR, (*tokens_ptr)[-1]));
-  return constraint;
+static inline ASTNode** parse_constraint(Token** tokens_ptr) {
+  // TODO: This will skip a constraint if its empty (`example :: (Constraint a, C) => ...` wont throw an error and catch `C`), fix later but idc for now
+  ASTNode** constraints = new_vector_with_capacity(*constraints, 4); // NOLINT(bugprone-sizeof-expression)
+  
+add_constraint:
+  if (!verify_types(tokens_ptr, constraint_types, elemsof(constraint_types)))
+    return NULL;
+
+  // TODO: Replace this for a binary search ?
+  ASTNode* constraint = constraints[0];
+  bool was_inserted = false;
+  for_each_element(constraint, constraints) {
+    if (strcmp(constraint->term.name, (*tokens_ptr)[-1].token) == 0) {
+      push(constraint[1].expression_v, token_to_term(TYPE_CONSTRUCTOR, (*tokens_ptr)[-2]));
+      was_inserted = true;
+      break;
+    }
+  }
+
+  if (!was_inserted) {
+    ASTNode* new_constraints = new_vector_with_capacity(*new_constraints, 2);
+    push(new_constraints, token_to_term(TYPE_CONSTRUCTOR, (*tokens_ptr)[-2]));
+    ASTNode* new_var = Malloc(sizeof(ASTNode)*2);
+    new_var[0] = token_to_term(TYPE, (*tokens_ptr)[-1]);
+    new_var[1] = (ASTNode) { .expression_v = new_constraints };
+
+    push(constraints, new_var);
+  } 
+
+  if (verify_types(tokens_ptr, comas, elemsof(comas)))
+    goto add_constraint;
+
+  return constraints;
 }
 
 AST parser(Token* tokens, Token** infixes, Error* error_buf) {
@@ -438,7 +466,7 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
           };
           if (tokens->type == OPEN_PAREN) {
             tokens++;
-            formal_type->formal_type.constraints_v_v = parse_sep_by(&tokens, &parse_typish, comas, elemsof(comas), 4);
+            formal_type->formal_type.constraints_v_v = parse_constraint(&tokens);
             if (
               handle(formal_type->formal_type.constraints_v_v && verify_types(&tokens, close_constaint, elemsof(close_constaint)),
                      &is_correct_ast, error_buf, &tokens, "Unexpected token", SEMI_COLON)
@@ -516,7 +544,7 @@ AST parser(Token* tokens, Token** infixes, Error* error_buf) {
         ASTNode** constraints;
         if (tokens->type == OPEN_PAREN) {
           tokens++;
-          constraints = parse_sep_by(&tokens, &parse_typish, comas, elemsof(comas), 4);
+          constraints = parse_constraint(&tokens);
           if (
             handle(constraints && verify_types(&tokens, close_constaint, elemsof(close_constaint)),
                    &is_correct_ast, error_buf, &tokens, "Unexpected token", SEMI_COLON)

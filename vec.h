@@ -29,7 +29,7 @@ vect_h* _get_header(void* vect);
 }\
 
 #define for_each(i, v) for (unsigned long i = 0, m = _get_header(v)->size; i < m; i++)
-#define for_each_element(x, v) for (unsigned long m = (unsigned long) v + _get_header(v)->obj_size*_get_header(v)->size; (unsigned long) v < m; v++, x = *v)
+#define for_each_element(x, v) for (unsigned long i = 0, m = (unsigned long) _get_header(v)->size; i < m; i++, x = v[i])
 #define vector_last(v) (v[_get_header(v)->size - 1])
 #define is_empty(v) (!_get_header(v)->size)
 #define vector_empty_it(v) (_get_header(v)->size = 0)
