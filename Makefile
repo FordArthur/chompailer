@@ -1,21 +1,26 @@
-CC = gcc
-CCFLAGS = -Wall -march=native -mavx2 -O2
-EXEC_FILE = chompailer
-SRC = $(wildcard *.c)
-OBJ = $(SRC:.c=.o)
+CC := gcc
+CCFLAGS := -Wall
+EXEC_FILE := chompailer
 
-all: $(EXEC_FILE)
+SRC_LOCATION := ./src
+BUILD_LOCATION := ./build
+TEST_LOCATION := ./test
 
-debug: CCFLAGS += -ggdb -g -D DEBUG
-debug: $(OBJ) 
-	$(CC) $^ -o $(EXEC_FILE)
-	
-%.o: %.c %.h
-	$(CC) -c $(CCFLAGS) $< -o $@
+SRCS := $(wildcard $(SRC_LOCATION)/*.c)
+OBJS := $(patsubst $(SRC_LOCATION)/%.c,$(BUILD_LOCATION)/%.o,$(SRCS))
 
-$(EXEC_FILE): $(OBJ)
-	$(CC) $^ -o $@
+build: $(OBJS)
+	$(CC) $(OBJS) -o $(EXEC_FILE)
+
+release: CCFLAGS += -O2 -mavx2 -march=native
+release: build
+
+debug: CCFLAGS += -g -ggdb2 -fsanitize=address
+debug: build
+
+$(BUILD_LOCATION)/%.o: $(SRC_LOCATION)/%.c
+	$(CC) $(CCFLAGS) -c $< -o $@
 
 .PHONY: clean
 clean:
-	rm -f $(OBJ)
+	rm -f $(BUILD_LOCATION)/*
