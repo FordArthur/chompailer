@@ -12,6 +12,11 @@ OBJS := $(patsubst $(SRC_LOCATION)/%.c,$(BUILD_LOCATION)/%.o,$(SRCS))
 build: $(OBJS)
 	$(CC) $(OBJS) -o $(EXEC_FILE)
 
+test: build
+	@for testfile in $(wildcard $(TEST_LOCATION)/*); do \
+		./$(EXEC_FILE) $$testfile; \
+	done
+
 release: CCFLAGS += -O2 -mavx2 -march=native
 release: build
 
@@ -23,4 +28,4 @@ $(BUILD_LOCATION)/%.o: $(SRC_LOCATION)/%.c
 
 .PHONY: clean
 clean:
-	rm -f $(BUILD_LOCATION)/*
+	rm -f $(BUILD_LOCATION)/* $(SRC_LOCATION)/*.gch

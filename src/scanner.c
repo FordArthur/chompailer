@@ -1,12 +1,30 @@
 #include "scanner.h"
-#include "vec.h"
 
 #define mktok(_type, _line, _index, _length, _token) ((Token) {.type = _type, .line = _line, .index = _index, .length = _length, .token = _token})
 
 static unsigned long _INDEX = 1;
 static unsigned long _LINE = 1;
 
-static char** _LINES;
+static void** _LINES;
+
+static inline unsigned long disntance_between(Stream stream, void* otherstream) {
+  return stream.disntance_between(stream.stream, otherstream);
+}
+static inline void* copy_stream_offset(Stream stream, long offset) {
+  return stream.copy_stream_offset(stream.stream, offset);
+}
+static inline void move_stream(Stream stream, long offset) {
+  return stream.move_stream(&stream.stream, offset);
+}
+static inline char look_around(Stream stream, long offset) {
+  return stream.look_around(stream.stream, offset);
+}
+static inline char get_char(Stream stream) {
+  return stream.get_char(stream.stream);
+}
+static inline char consume_char(Stream stream) {
+  return stream.consume_char(&stream.stream);
+}
 
 #ifdef DEBUG
 #pragma GCC push_options
@@ -16,6 +34,7 @@ static char** _LINES;
 void print_token(Token* tok) {
   printf("\t|\n    %lu\t| %s (%d)\n\t| ^\n\t  %lu - %lu\n\n", tok->line, tok->token, tok->type, tok->index, tok->length);
 }
+
 // Size must not take into account null delimiter
 static inline char* reserve_token(const unsigned long size, const char* stream) {
   char* tok = Malloc((size + 1)*sizeof(char));
@@ -49,13 +68,13 @@ static inline bool isiden(char c) {
   return isalnum(c) || c == '_' || c == '\'';
 }
 
-static inline char consume(char** stream_ptr) {
-  if (!**stream_ptr)
+static inline char consume(Stream* stream_ptr) {
+  if (stream_ptr->get_char(stream_ptr->stream))
     return '\0';
 
-  char ch = *((*stream_ptr)++);
+  char ch = stream_ptr->consume_char(stream_ptr->stream);
   if (ch == '\n') {
-    push(_LINES, *stream_ptr);
+    push(_LINES, stream_ptr->stream);
     _LINE++;
     _INDEX = 1;
   } else {
@@ -64,10 +83,10 @@ static inline char consume(char** stream_ptr) {
   return ch;
 }
 
-Tokens scanner(char *stream) {
+Tokens scanner(Stream stream) {
   bool is_correct_stream = true;
   _LINES = new_vector_with_capacity(*_LINES, 32);
-  push(_LINES, stream);
+  push(_LINES, stream.stream);
   Token* token_stream = new_vector_with_capacity(*token_stream, 128);
   Error* error_buffer = new_vector_with_capacity(*error_buffer, 16);
   // This is fine, what we want to store in this vector is pointers, not structures
@@ -153,32 +172,32 @@ Tokens scanner(char *stream) {
         );
         break;
       case '/':
-        if (stream[0] == '/') {
-          char* start_comment = stream - 1;
+        if (get_char(stream) == '/') {
+          void* start_comment = copy_stream_offset(stream, -1);
           unsigned long index = _INDEX - 1;
           unsigned long size;
 
-          while (*stream && *stream != '\n')
+          while (get_char(stream) && get_char(stream) != '\n')
             consume(&stream);
 
-          start_comment = reserve_token(size = stream - start_comment, start_comment);
+          start_comment = reserve_token(size = disntance_between(stream, start_comment), start_comment);
 
           push(
             token_stream,
             mktok(COMMENT, _LINE, index, size, start_comment)
           );
 
-        } else if (stream[0] == '*') {
-          char* start_comment = stream - 1;
+        } else if (get_char(stream) == '*') {
+          void* start_comment = copy_stream_offset(stream, -1);
           unsigned long index = _INDEX - 1;
           unsigned long size;
 
-          while (*stream && stream[1] != '*' && stream[2] != '/')
+          while (get_char(stream) && look_around(stream, 1) != '*' && look_around(stream, 2)!= '/')
             consume(&stream);
 
-          stream += 3;
+          move_stream(stream, 3);
           _INDEX += 3;
-          start_comment = reserve_token(size = stream - start_comment, start_comment);
+          start_comment = reserve_token(size =disntance_between(stream, start_comment), start_comment);
           consume(&stream);
 
           push(
@@ -189,15 +208,15 @@ Tokens scanner(char *stream) {
           goto scan_symbol;
         break;
       case '\'':
-        if (stream[1] == '\'' || (stream[0] == '\\' && stream[2] == '\'')) {
-          char offs, character = (offs = stream[1] == '\'')? stream[0] : escape_char(stream[1]);
+        if (look_around(stream, 1) == '\'' || (get_char(stream) == '\\' &&look_around(stream, 2) == '\'')) {
+          char offs, character = (offs =look_around(stream, 1) == '\'') ? get_char(stream) : escape_char(look_around(stream, 1));
 
           push(
             token_stream,
             mktok(CHARACTER, _LINE, _INDEX, 1, reserve_token(1, &character))
           );
 
-          stream += (!offs) + 2;
+          move_stream(stream, (!offs) + 2);
           _INDEX += (!offs) + 2;
         } else {
           is_correct_stream = false;
@@ -208,20 +227,20 @@ Tokens scanner(char *stream) {
         }
         break;
       case '"': {
-        char* start_string = new_vector_with_capacity(*start_string, 32);
-        push(start_string, '\"');
+        char* start_string_v = new_vector_with_capacity(*start_string_v, 32);
+        push(start_string_v, '\"');
         unsigned long index = _INDEX - 1;
 
-        while (*stream && *stream != '"') {
-          if (*stream == '\\') {
-            stream++;
-            push(start_string, escape_char(*stream));
+        while (get_char(stream) && get_char(stream) != '"') {
+          if (get_char(stream) == '\\') {
+            move_stream(stream, 1);
+            push(start_string_v, escape_char(get_char(stream)));
           } else {
-            push(start_string, *stream);
+            push(start_string_v, get_char(stream));
           }
           consume(&stream);
         }
-        if (!*stream) {
+        if (!get_char(stream)) {
           is_correct_stream = false;
           push(
             error_buffer,
@@ -230,11 +249,11 @@ Tokens scanner(char *stream) {
           break;
         }
 
-        push(start_string, '\"');
+        push(start_string_v, '\"');
 
         push(
           token_stream, 
-          mktok(STRING, _LINE, index, _INDEX - index - 1, start_string)
+          mktok(STRING, _LINE, index, _INDEX - index - 1, start_string_v)
         );
         consume(&stream);
         break;
@@ -249,22 +268,22 @@ Tokens scanner(char *stream) {
       case '7':
       case '8':
       case '9': {
-        char* start_number = stream - 1;
+        void* start_number = copy_stream_offset(stream, 1);
         unsigned long index = _INDEX - 1;
         unsigned long size;
         TokenType numtype = NATURAL;
 
       scan_num:
-        while (isdigit(*stream))
+        while (isdigit(get_char(stream)))
           consume(&stream);
 
-        if (*stream == '.' && numtype == NATURAL) {
+        if (get_char(stream) == '.' && numtype == NATURAL) {
           consume(&stream);
           numtype = REAL;
           goto scan_num;
         }
 
-        start_number = reserve_token(size = stream - start_number, start_number);
+        start_number = reserve_token(size = disntance_between(stream, start_number), start_number);
 
         push(
           token_stream, 
@@ -274,19 +293,19 @@ Tokens scanner(char *stream) {
         break;
       }
       default: scan_symbol: {
-        char* start_token = stream - 1;
+        void* start_token = copy_stream_offset(stream, 1);
         unsigned long index = _INDEX - 1;
         unsigned long size;
 
         bool is_alnum = isiden(curchar);
         bool (*symbol_scanning)(char) = is_alnum? isiden : isoper;
 
-        while (*stream && (*symbol_scanning)(*stream)) {
+        while (get_char(stream) && (*symbol_scanning)(get_char(stream))) {
           consume(&stream);
         }
 
-        start_token = reserve_token(size = stream - start_token, start_token);
-        TokenType toktype = isupper(*start_token)? TYPE_K : follow_pattern_with_default(start_token, syntax_trie, is_alnum? IDENTIFIER : OPERATOR);
+        start_token = reserve_token(size = disntance_between(stream, start_token), start_token);
+        TokenType toktype = isupper(stream.get_char(start_token))? TYPE_K : follow_pattern_with_default(start_token, syntax_trie, is_alnum? IDENTIFIER : OPERATOR);
 
         push(
           token_stream, 
@@ -301,7 +320,7 @@ Tokens scanner(char *stream) {
     }
   }
 
-  push(_LINES, stream);
+  push(_LINES, stream.stream);
   push(token_stream, mktok(EndOfFile, _LINE, _INDEX, 0, NULL));
   return (Tokens) {
     .is_correct_stream = is_correct_stream,

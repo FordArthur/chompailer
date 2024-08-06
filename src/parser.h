@@ -21,17 +21,7 @@ typedef enum TermType {
   TYPE,
 } TermType;
 
-typedef struct TypeVar {
-  signed short info     : 16;
-  unsigned long ast_ptr : 48;
-} TypeVar;
-
-typedef unsigned long TypeConcrete;
-
-typedef union Type {
-  TypeVar var;
-  TypeConcrete conc;
-} Type;
+typedef struct Type Type;
 
 typedef enum ASTType {
   TERM,
@@ -43,6 +33,7 @@ typedef enum ASTType {
   V_DEFINITION,
   F_DEFINITION,
   CONSTRUCTOR_DECLARATION,
+  DATA_DECLARATION,
   INSTANCE_DEFINITION,
   CLASS_DECLARATION,
 } ASTType;
@@ -77,10 +68,14 @@ typedef struct ASTNode {
       struct ASTNode** body_v;
     } implementation;
     struct {
-      struct ASTNode** constraints_v_v;
-      Type** type_v_v;
+      Type* declaration;
       struct ASTNode* implementations_v;
     } function_definition;
+    struct {
+      struct ASTNode** constraints_v_v;
+      Type** constructor_type_v_v;
+    } constructor_declaration;
+    struct ASTNode* type_arguments_v;
     struct {
       struct ASTNode* arguments_v;
       struct ASTNode* expression;
@@ -95,6 +90,26 @@ typedef struct ASTNode {
     } class_declaration;
   };
 } ASTNode;
+
+typedef enum TypeKind {
+  CONSTRUCTOR, VAR, CONCRETE, FUNC
+} TypeKind;
+
+typedef struct Type {
+  TypeKind kind;
+  union {
+    struct Type* constructor;
+    ASTNode* concrete;
+    struct {
+      // Note: since pointers are either 64 bits, in which case it needs to be 8 byte aligned (so 2 ints),
+      // or 32 bits, in which case it needs to be 4 byte aligned (2 ints again) we can just give identifier int,
+      // using space that would otherwise be lost
+      int identifier;
+      ASTNode* constraints;
+    } var;
+    struct Type* func;
+  };
+} Type;
 
 typedef struct AST {
   bool is_correct_ast;

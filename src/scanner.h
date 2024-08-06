@@ -54,13 +54,23 @@ typedef struct Token {
 
 typedef struct Tokens {
   bool is_correct_stream;
-  char** lines;
+  void** lines;
   struct {
     Token* token_stream;
     Token** infixes;
   } scanned;
   Error* error_buf;
 } Tokens;
+
+typedef struct Stream {
+  void* stream;
+  char (*consume_char)(void**);
+  char (*get_char)(void*);
+  char (*look_around)(void*, long);
+  void (*move_stream)(void**, long);
+  void* (*copy_stream_offset)(void*, long);
+  unsigned long (*distance_between)(void*, void*);
+} Stream;
 
 /** Scanner rules:
  * Numbers:
@@ -74,7 +84,7 @@ typedef struct Tokens {
  * - Operator ::= <ºª!·$%&/=?¿^+*<>,.:-_|@#~½¬•>
  */
 
-Tokens scanner(char* stream);
+Tokens scanner(Stream stream);
 
 void print_token(Token* tok);
 
