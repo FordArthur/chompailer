@@ -68,7 +68,7 @@ typedef struct ASTNode {
       struct ASTNode** body_v;
     } implementation;
     struct {
-      Type* declaration;
+      Type** declaration;
       struct ASTNode* implementations_v;
     } function_definition;
     struct {
@@ -121,6 +121,16 @@ typedef struct AST {
 
 void print_AST(ASTNode* ast);
 
+// Checks one type IS THE SAME as the other (reflexive)
+// Assumes they are in the same context
+bool type_eq(Type type1, Type type2) __attribute__ ((pure));
+// Cheks if type1 COULD BECOME type2 (not reflexive)
+// Doesn't assume anything
+bool type_iso(Type type1, Type type2) __attribute__ ((pure));
+
+/** Parser rules:
+ *
+ */
 AST parser(Token* tokens, Token** infixes, Error* error_buf);
 
 #endif // !CHORILANG_PARSER_HEADER

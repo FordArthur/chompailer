@@ -1,9 +1,6 @@
 #include "parser.h"
-#include "compiler_inner_types.h"
-#include "scanner.h"
 #include "trie.h"
 #include "vec.h"
-#include <string.h>
 
 #define elemsof(xs) \
   (sizeof(xs)/sizeof(xs[0]))
@@ -25,10 +22,77 @@ typedef struct PrecInfo {
 
 typedef unsigned char ExpStackIndex;
 
+typedef ASTNode* Instances;
+
 #ifdef DEBUG
 #pragma GCC push_options
 #pragma GCC optimize ("O0")
 #endif
+
+inline bool type_eq(Type type1, Type type2) {
+  if (type1.kind == VAR && type2.kind == VAR || type1.kind == CONCRETE && type2.kind == CONCRETE)
+    return type1.kind == VAR? type1.var.identifier == type2.var.identifier : type1.concrete == type2.concrete;
+  if (type1.kind == CONSTRUCTOR && type2.kind == CONSTRUCTOR || type1.kind == FUNC && type2.kind == FUNC) {
+    Type* vec1 = type1.kind == CONSTRUCTOR? type1.constructor : type1.func;
+    Type* vec2 = type2.kind == CONSTRUCTOR? type2.constructor : type2.func;
+    if (sizeof_vector(vec1) != sizeof_vector(vec2))
+      return false;
+    for_each(i, vec1) {
+      if (!type_eq(vec1[i], vec2[i]))
+        return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+inline bool is_constraint_subset(ASTNode* subset, ASTNode* set) {
+  if (subset) for_each(i, subset) {
+    if (set) for_each(j, set) {
+      if (strcmp(subset[i].term.name, set[i].term.name) == 0)
+        goto to_continue;
+    }
+    return false;
+  to_continue:
+    continue;
+  }
+  return true;
+}
+
+inline bool type_iso(Type type1, Type type2) {
+  if (type1.kind == CONCRETE && type2.kind == CONCRETE) {
+    return type1.concrete == type2.concrete;
+  }
+  if (type1.kind == CONSTRUCTOR && type2.kind == CONSTRUCTOR || type1.kind == FUNC && type2.kind == FUNC) {
+    Type* vec1 = type1.kind == CONSTRUCTOR? type1.constructor : type1.func;
+    Type* vec2 = type2.kind == CONSTRUCTOR? type2.constructor : type2.func;
+    if (sizeof_vector(vec1) != sizeof_vector(vec2))
+      return false;
+    for_each(i, vec1) {
+      if (!type_iso(vec1[i], vec2[i]))
+        return false;
+    }
+    return true;
+  }
+  if (type1.kind == VAR) {
+    switch (type2.kind) {
+      case FUNC:
+        return false;
+      case CONSTRUCTOR: {
+        Type constructor = type2.constructor[0];
+        Instances instances = constructor.concrete;
+        return is_constraint_subset(type1.var.constraints, instances);
+        break;
+      }
+      case CONCRETE:
+        break;
+      case VAR:
+        return is_constraint_subset(type1.var.constraints, type2.var.constraints);
+        break;
+    }
+  }
+  return false;
+}
 
 static inline bool in_delims(TokenType type, TokenType* dels, unsigned long dels_s);
 
@@ -404,7 +468,7 @@ static inline Type as_type(
       push(error_buf, mkerr(PARSER, type_node->term.line, type_node->term.index, "Arity doesn't match"));
       return (Type) { .kind = -1 };
     }
-    Type* constructor = new_vector_with_capacity(*constructor, 4);
+    Type* constructor = new_vector_with_capacity(*constructor, sizeof_vector(con_type));
     push(constructor, ((Type) { .kind = CONCRETE, .concrete = con_type }) )
     for (unsigned long i = 1; i < _get_header(type_node)->size; i++) { 
       push(constructor, as_type(type_node + i, type_constraints_context, type_identifier_context, false));
@@ -517,10 +581,22 @@ AST parser(Token* tokens, Token** infixes, Error* _error_buf) {
             handle(&tokens, "Expecting arrow");
           parse_type_expression(&tokens, ret_type);
           push(decl, ret_type);
-          Type* decl_type = new_vector_with_capacity(*decl_type, 4);
+          Type** decl_type = new_vector_with_capacity(*decl_type, 4); // NOLINT(bugprone-sizeof-expression)
+          Type* decl_unique_type = new_vector_with_capacity(*decl_unique_type, 4);
           int iden_ctx = 0;
           for_each(i, decl) {
-            push(decl_type, as_type(decl[i], constraint_context, &iden_ctx, true));
+            Type type = as_type(decl[i], constraint_context, &iden_ctx, true);
+            Type* type_ptr;
+            for_each(j, decl_unique_type) {
+              if (type_eq(decl_unique_type[i], type)) {
+                type_ptr = decl_unique_type + i;
+                goto to_push;
+              }
+            }
+            push(decl_unique_type, type);
+            type_ptr = &vector_last(decl_unique_type);
+          to_push:
+            push(decl_type, type_ptr);
           }
           def->function_definition.declaration = decl_type;
           break;
