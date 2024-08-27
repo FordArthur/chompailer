@@ -17,22 +17,15 @@ typedef enum TermType {
   TCHARACTER,
   TSTRING,
   TYPE_CONSTRUCTOR,
-
-  TYPE,
 } TermType;
-
-typedef struct Type Type;
 
 typedef enum ASTType {
   TERM,
   EXPRESSION,
   BIN_EXPRESSION,
-  FORMAL_TYPE,
-  DECLARATION,
+  TYPE_ASSERTION,
   IMPLEMENTATION,
   V_DEFINITION,
-  F_DEFINITION,
-  CONSTRUCTOR_DECLARATION,
   DATA_DECLARATION,
   INSTANCE_DEFINITION,
   CLASS_DECLARATION,
@@ -56,80 +49,52 @@ typedef struct ASTNode {
       struct ASTNode* right_expression_v;
     } bin_expression;
     struct {
-      struct ASTNode** constraints_v_v;
-      Type** type_v_v;
-    } formal_type;
+      struct ASTNode* expression;
+      struct ASTNode** constraints;
+      struct ASTNode* type_v;
+    } type_assertion;
     struct {
-      struct ASTNode* expression_v;
-      struct ASTNode* formal_type;
-    } declaration;
-    struct {
-      struct ASTNode* arguments_v;
+      struct ASTNode* lhs;
       struct ASTNode** body_v;
     } implementation;
     struct {
-      Type** declaration;
-      struct ASTNode* implementations_v;
-    } function_definition;
+      struct ASTNode* type;
+      struct ASTNode** constructors;
+    } data_declaration;
     struct {
-      struct ASTNode** constraints_v_v;
-      Type** constructor_type_v_v;
-    } constructor_declaration;
-    struct ASTNode* type_arguments_v;
-    struct {
-      struct ASTNode* arguments_v;
+      struct ASTNode* name;
       struct ASTNode* expression;
     } variable_definition;
     struct {
+      struct ASTNode* instance_class;
       struct ASTNode* instance_type;
-      struct ASTNode* implementations_v;
+      struct ASTNode** implementations_v;
     } instance_definition;
     struct {
-      struct ASTNode* instance_type;
-      struct ASTNode* declarations_v;
+      struct ASTNode* class_name;
+      struct ASTNode** declarations_v;
     } class_declaration;
   };
 } ASTNode;
 
-typedef enum TypeKind {
-  CONSTRUCTOR, VAR, CONCRETE, FUNC
-} TypeKind;
-
-typedef struct Type {
-  TypeKind kind;
-  union {
-    struct Type* constructor;
-    ASTNode* concrete;
-    struct {
-      // Note: since pointers are either 64 bits, in which case it needs to be 8 byte aligned (so 2 ints),
-      // or 32 bits, in which case it needs to be 4 byte aligned (2 ints again) we can just give identifier int,
-      // using space that would otherwise be lost
-      int identifier;
-      ASTNode* constraints;
-    } var;
-    struct Type* func;
-  };
-} Type;
-
 typedef struct AST {
   bool is_correct_ast;
-  TrieNode* astrie;
-  TrieNode* type_trie;
-  TrieNode* instance_trie;
+  ASTNode* ast;
   Error* error_buf;
 } AST;
 
 void print_AST(ASTNode* ast);
 
-// Checks one type IS THE SAME as the other (reflexive)
-// Assumes they are in the same context
-bool type_eq(Type type1, Type type2) __attribute__ ((pure));
-// Cheks if type1 COULD BECOME type2 (not reflexive)
-// Doesn't assume anything
-bool type_iso(Type type1, Type type2) __attribute__ ((pure));
 
 /** Parser rules:
- *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * Note that this BNF-like syntax is less literal, "" refer to tokens with that name,        *
+ * {} are literal, and () represent an output to the rule (that is info that we keep)        *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * Top-level:
+ * - Declaration ::= (function name) :: <(types), `separated by comas and ended by an arrow`>
+ * - Implementation ::= (function name) (<args>) = <(expression) `separated by comas and ended by a semicolon`>
+ * - Class declaration ::= "class"  { <declaration> }
  */
 AST parser(Token* tokens, Token** infixes, Error* error_buf);
 

@@ -1,5 +1,6 @@
 CC := gcc
 CCFLAGS := -Wall
+LDFLAGS :=
 EXEC_FILE := chompailer
 
 SRC_LOCATION := ./src
@@ -10,7 +11,7 @@ SRCS := $(wildcard $(SRC_LOCATION)/*.c)
 OBJS := $(patsubst $(SRC_LOCATION)/%.c,$(BUILD_LOCATION)/%.o,$(SRCS))
 
 build: $(OBJS)
-	$(CC) $(OBJS) -o $(EXEC_FILE)
+	$(CC) $(LDFLAGS) $(OBJS) -o $(EXEC_FILE)
 
 test: build
 	@for testfile in $(wildcard $(TEST_LOCATION)/*); do \
@@ -20,7 +21,11 @@ test: build
 release: CCFLAGS += -O2 -mavx2 -march=native
 release: build
 
-debug: CCFLAGS += -g -ggdb2 -fsanitize=address
+gdb: CCFLAGS += -g -ggdb3
+gdb: build
+
+debug: CCFLAGS += -g -ggdb3 -fsanitize=address -fno-omit-frame-pointer -static-libstdc++ -lrt
+debug: LDFLAGS += -fsanitize=address -static-libasan
 debug: build
 
 $(BUILD_LOCATION)/%.o: $(SRC_LOCATION)/%.c

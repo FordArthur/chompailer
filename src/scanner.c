@@ -7,8 +7,8 @@ static unsigned long _LINE = 1;
 
 static void** _LINES;
 
-static inline unsigned long disntance_between(Stream stream, void* otherstream) {
-  return stream.disntance_between(stream.stream, otherstream);
+static inline unsigned long distance_between(Stream stream, void* otherstream) {
+  return stream.distance_between(stream.stream, otherstream);
 }
 static inline void* copy_stream_offset(Stream stream, long offset) {
   return stream.copy_stream_offset(stream.stream, offset);
@@ -69,10 +69,10 @@ static inline bool isiden(char c) {
 }
 
 static inline char consume(Stream* stream_ptr) {
-  if (stream_ptr->get_char(stream_ptr->stream))
+  if (!stream_ptr->get_char(stream_ptr->stream))
     return '\0';
 
-  char ch = stream_ptr->consume_char(stream_ptr->stream);
+  char ch = stream_ptr->consume_char(&stream_ptr->stream);
   if (ch == '\n') {
     push(_LINES, stream_ptr->stream);
     _LINE++;
@@ -180,7 +180,7 @@ Tokens scanner(Stream stream) {
           while (get_char(stream) && get_char(stream) != '\n')
             consume(&stream);
 
-          start_comment = reserve_token(size = disntance_between(stream, start_comment), start_comment);
+          start_comment = reserve_token(size = distance_between(stream, start_comment), start_comment);
 
           push(
             token_stream,
@@ -197,7 +197,7 @@ Tokens scanner(Stream stream) {
 
           move_stream(stream, 3);
           _INDEX += 3;
-          start_comment = reserve_token(size =disntance_between(stream, start_comment), start_comment);
+          start_comment = reserve_token(size =distance_between(stream, start_comment), start_comment);
           consume(&stream);
 
           push(
@@ -268,7 +268,7 @@ Tokens scanner(Stream stream) {
       case '7':
       case '8':
       case '9': {
-        void* start_number = copy_stream_offset(stream, 1);
+        void* start_number = copy_stream_offset(stream, -1);
         unsigned long index = _INDEX - 1;
         unsigned long size;
         TokenType numtype = NATURAL;
@@ -283,7 +283,7 @@ Tokens scanner(Stream stream) {
           goto scan_num;
         }
 
-        start_number = reserve_token(size = disntance_between(stream, start_number), start_number);
+        start_number = reserve_token(size = distance_between(stream, start_number), start_number);
 
         push(
           token_stream, 
@@ -293,7 +293,7 @@ Tokens scanner(Stream stream) {
         break;
       }
       default: scan_symbol: {
-        void* start_token = copy_stream_offset(stream, 1);
+        void* start_token = copy_stream_offset(stream, -1);
         unsigned long index = _INDEX - 1;
         unsigned long size;
 
@@ -304,7 +304,7 @@ Tokens scanner(Stream stream) {
           consume(&stream);
         }
 
-        start_token = reserve_token(size = disntance_between(stream, start_token), start_token);
+        start_token = reserve_token(size = distance_between(stream, start_token), start_token);
         TokenType toktype = isupper(stream.get_char(start_token))? TYPE_K : follow_pattern_with_default(start_token, syntax_trie, is_alnum? IDENTIFIER : OPERATOR);
 
         push(

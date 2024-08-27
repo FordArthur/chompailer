@@ -18,11 +18,17 @@ typedef struct TrieNode {
 } TrieNode;
 
 void _print_trie(TrieNode* trie, unsigned long spacing);
+
 #define print_trie(t) _print_trie(t, 0)
+
 TrieNode* create_node(char key, unsigned long value);
+
 bool insert_trie(char* pattern, unsigned long final_value, TrieNode* trie);
+
 bool insert_if_unique(char* pattern, unsigned long final_value, TrieNode* trie);
-unsigned long follow_pattern_with_default(char* pattern, TrieNode* trie, unsigned long _default);
+
+unsigned long follow_pattern_with_default(char* pattern, TrieNode* trie, unsigned long _default) __attribute__ ((pure));
+
 void for_each_in_trie(TrieNode* trie, void (*func)(unsigned long value));
 
 #endif  // !CHORILANG_TRIE_HEADER
