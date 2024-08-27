@@ -92,7 +92,7 @@ static inline bool is_constraint_subset(ASTNode* subset, ASTNode* set) {
   return true;
 }
 
-// TODO:
+static ASTNode renaming;
 static inline bool type_iso(Type type1, Type type2) {
   if (type1.kind == CONCRETE && type2.kind == CONCRETE) {
     return type1.concrete == type2.concrete;
@@ -130,7 +130,7 @@ static inline bool type_iso(Type type1, Type type2) {
   return false;
 }
 
-static inline void apply_morphs(Type* type1, bool ext1, Type* type2, bool ext2, int* ctx) {
+static inline void apply_morphs(ASTNode* renamable1, Type* type1, bool ext1, Type* type2, bool ext2, int* ctx) {
   switch (ext1 + ext2) {
     case 2:
       if (!type_iso(*type1, *type2)) {
@@ -149,6 +149,8 @@ static inline void apply_morphs(Type* type1, bool ext1, Type* type2, bool ext2, 
       if (!type_iso(*type1, *type2)) {
         // err
       }
+      if (renaming.type != -1) *renamable1 = renaming;
+      return;
     }
     case 0:
       if (!type_eq(*type1, *type2)) {
@@ -220,9 +222,9 @@ static Type* type_of_expression(ASTNode* expression, ScopeEntry* scope, int* ide
       Type* op_signature = get_type(expression->bin_expression.op->term.name, scope);
       bool is_op_external = is_external;
       targ = type_of_expression(expression->bin_expression.left_expression_v, scope, identifier_context);
-      apply_morphs(&op_signature->func[0], is_op_external, targ, is_external, identifier_context);
+      apply_morphs(expression->bin_expression.op, &op_signature->func[0], is_op_external, targ, is_external, identifier_context);
       targ = type_of_expression(expression->bin_expression.right_expression_v, scope, identifier_context);
-      apply_morphs(&op_signature->func[1], is_op_external, targ, is_external, identifier_context);
+      apply_morphs(expression->bin_expression.op, &op_signature->func[1], is_op_external, targ, is_external, identifier_context);
       is_external = is_op_external;
       return &op_signature->func[2];
     }
@@ -235,7 +237,7 @@ static Type* type_of_expression(ASTNode* expression, ScopeEntry* scope, int* ide
       }
       for (unsigned long i = 1; i < sizeof_vector(f_signature->func); i++) {
         targ = type_of_expression(expression->expression_v + i, scope, identifier_context);
-        apply_morphs(&f_signature->func[i], is_func_external, targ, is_external, identifier_context);
+        apply_morphs(expression->expression_v, &f_signature->func[i], is_func_external, targ, is_external, identifier_context);
       }
       is_external = is_func_external;
       return &vector_last(f_signature->func);

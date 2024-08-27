@@ -64,6 +64,7 @@ bool_lambda(not_iden_and_types, (t != TYPE_K && t != IDENTIFIER));
 bool_lambda(value, (in_delims(t, value_expression, elemsof(value_expression))))
 bool_lambda(value_delims, (t == COMA || t == SEMI_COLON || t == EQUALS || t == OPERATOR || t == OPEN_PAREN || t == CLOSE_PAREN));
 
+static bool top_level_assertion = true;
 void print_AST(ASTNode* ast) {
   if (!ast) {
     printf(":: To be inferred");
@@ -95,9 +96,11 @@ void print_AST(ASTNode* ast) {
       printf("\b)");
       break;
     case TYPE_ASSERTION:
-      if (ast->type_assertion.expression) for_each(i, ast->type_assertion.expression) {
+      if (!top_level_assertion) for_each(i, ast->type_assertion.expression) {
         print_AST(ast->type_assertion.expression + i);
         printf(" ");
+      } else {
+        printf("%s ", ast->type_assertion.expression->term.name);
       }
       printf(":: ");
       printf("(");
@@ -125,6 +128,7 @@ void print_AST(ASTNode* ast) {
         printf(" ");
       }
       printf("= ");
+      top_level_assertion = false;
       if (ast->type == IMPLEMENTATION) { 
         for_each(i, ast->implementation.body_v) {
           if (ast->implementation.body_v[i]->type == BIN_EXPRESSION
@@ -142,6 +146,7 @@ void print_AST(ASTNode* ast) {
       else for_each(i, ast->variable_definition.expression)
         print_AST(ast->variable_definition.expression + i);
       printf("\b; ");
+      top_level_assertion = true;
       break;
     case DATA_DECLARATION:
       printf("data ");
@@ -196,7 +201,7 @@ static inline void handle(Token** tokens_ptr, char* err_msg) {
   is_correct_ast = false;
   push(error_buf, mkerr(PARSER, (*tokens_ptr)->line, (*tokens_ptr)->index, err_msg));
   for (; (*tokens_ptr)->type != skip_to_tok && (*tokens_ptr)->type != EndOfFile; (*tokens_ptr)++);
-  (*tokens_ptr)++;
+  if ((*tokens_ptr)->type != EndOfFile) (*tokens_ptr)++;
   longjmp(jumping_buf, 0);
 }
 
