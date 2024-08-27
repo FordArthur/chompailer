@@ -92,7 +92,7 @@ static inline bool is_constraint_subset(ASTNode* subset, ASTNode* set) {
   return true;
 }
 
-static ASTNode renaming;
+static ASTNode renaming  = (ASTNode) { .type = -1 };
 static inline bool type_iso(Type type1, Type type2) {
   if (type1.kind == CONCRETE && type2.kind == CONCRETE) {
     return type1.concrete == type2.concrete;
@@ -130,45 +130,39 @@ static inline bool type_iso(Type type1, Type type2) {
   return false;
 }
 
-static inline void apply_morphs(ASTNode* renamable1, Type* type1, bool ext1, Type* type2, bool ext2, int* ctx) {
-  switch (ext1 + ext2) {
-    case 2:
-      if (!type_iso(*type1, *type2)) {
-        // err
-      }
-      return;
-    case 1: {
-      if (type1->kind == ANY) {
-        *type1 = *type2;
-        return;
-      } if (type2->kind == ANY) {
-        *type2 = *type1;
-        return;
-      }
-
-      if (!type_iso(*type1, *type2)) {
-        // err
-      }
-      if (renaming.type != -1) *renamable1 = renaming;
-      return;
-    }
-    case 0:
-      if (!type_eq(*type1, *type2)) {
-        // err
-      }
-      return;
+static inline void solve_func_equation(
+  ASTNode* func_node, Type* func_type, Type* arg_type,
+  unsigned int arg_position
+) {
+  if (func_type->func[arg_position].kind == ANY) {
+    func_type->func[arg_position] = *arg_type;
+    return;
   }
+  if (arg_type->kind == ANY) {
+    *arg_type = func_type->func[arg_position];
+    return;
+  } 
+
+  if (!type_iso(*func_type, *arg_type)) {
+    // err
+  }
+  
+  if (renaming.type != -1) *func_node = renaming;
+
+  for_each(i, func_type->func) {
+    if (i != arg_position && type_eq(func_type->func[i], func_type->func[arg_position])) {
+      func_type->func[i] = *arg_type;
+    }
+  }
+  func_type->func[arg_position] = *arg_type;
 }
 
-static bool is_external;
 static Type* get_type(char* name, ScopeEntry* scope_stack) {
   for_each(i, scope_stack) {
     if (strcmp(scope_stack[i].name, name) == 0) {
-      is_external = true;
       return &scope_stack[i].type;
     }
   }
-  is_external = false;
   Type* t = (Type*) follow_pattern_with_default(name, type_trie, 0);
   if (!t) {
     // err
@@ -220,30 +214,25 @@ static Type* type_of_expression(ASTNode* expression, ScopeEntry* scope, int* ide
     case BIN_EXPRESSION: {
       Type* targ;
       Type* op_signature = get_type(expression->bin_expression.op->term.name, scope);
-      bool is_op_external = is_external;
       targ = type_of_expression(expression->bin_expression.left_expression_v, scope, identifier_context);
-      apply_morphs(expression->bin_expression.op, &op_signature->func[0], is_op_external, targ, is_external, identifier_context);
+      solve_func_equation(expression->bin_expression.op, op_signature, targ, 0);
       targ = type_of_expression(expression->bin_expression.right_expression_v, scope, identifier_context);
-      apply_morphs(expression->bin_expression.op, &op_signature->func[1], is_op_external, targ, is_external, identifier_context);
-      is_external = is_op_external;
+      solve_func_equation(expression->bin_expression.op, op_signature, targ, 1);
       return &op_signature->func[2];
     }
     case EXPRESSION: {
       Type* targ;
       Type* f_signature = type_of_expression(expression->expression_v, scope, identifier_context);
-      bool is_func_external = is_external;
       if (sizeof_vector(f_signature->func) != sizeof_vector(expression->expression_v)) {
         // err
       }
       for (unsigned long i = 1; i < sizeof_vector(f_signature->func); i++) {
         targ = type_of_expression(expression->expression_v + i, scope, identifier_context);
-        apply_morphs(expression->expression_v, &f_signature->func[i], is_func_external, targ, is_external, identifier_context);
+        solve_func_equation(expression->bin_expression.op, f_signature, targ, i);
       }
-      is_external = is_func_external;
       return &vector_last(f_signature->func);
     }
     case TERM: {
-      is_external = false;
       switch (expression->term.type) {
         case FUNCTION:
         case TYPE_CONSTRUCTOR: return get_type(expression->term.name, scope);
