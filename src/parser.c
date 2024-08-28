@@ -13,7 +13,7 @@
     .term.line = tok.line,  .term.length = tok.length,  .term.name = tok.token\
     }
 
-jmp_buf jumping_buf;
+static jmp_buf jumping_buf;
 
 // !! It's really important that the size of this struct isnt greater than unsigned long !!
 typedef struct PrecInfo {
